@@ -10,5 +10,9 @@
     "audit": "node audit.mjs",
     "extract": "node extract.mjs"
   },
-  "license": "PolyForm-Noncommercial-1.0.0"
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "dependencies": {
+    "an-array-of-english-words": "^2.0.0",
+    "write-good": "^1.0.8"
+  }
 }

@@ -1,6 +1,6 @@
 name: ci
 
-# Smoke test: the deterministic auditor runs offline (no key) and the CAS cache works.
+# Content-audit pipeline: install → audit (deterministic) → cache invariant → extract+coverage.
 on:
   push:
     branches: [main]
@@ -10,14 +10,18 @@ permissions:
   contents: read
 
 jobs:
-  audit:
+  pipeline:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
-      - name: Audit (deterministic, offline)
+      - name: Install (wordlist + write-good)
+        run: npm ci
+      - name: Audit (deterministic — spell + grammar + grounding)
         run: node audit.mjs
-      - name: Cache is content-addressed (second run = 0 API calls)
+      - name: Cache invariant (second run = 0 API calls)
         run: node audit.mjs | grep -q "0 miss"
+      - name: Extract + coverage
+        run: node extract.mjs samples/page.html
