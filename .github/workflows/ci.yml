@@ -27,3 +27,12 @@ jobs:
         run: node audit.mjs | grep -q "0 miss"
       - name: Extract + coverage
         run: node extract.mjs samples/page.html
+      - name: Room — mount the socket store + audit through it
+        run: |
+          node store-daemon.mjs &
+          DPID=$!
+          for i in $(seq 1 50); do [ -S .room/store.sock ] && break; sleep 0.1; done
+          test -S .room/store.sock                       # the door is mounted in the room
+          STORE=socket node audit.mjs                    # cold — populate via the socket
+          STORE=socket node audit.mjs | grep -q "0 miss" # warm — 0 calls, served from the room
+          kill "$DPID"
