@@ -1,0 +1,27 @@
+{
+  "pdp.hero.headline": {
+    "type": "headline",
+    "value": "The frame that fills itself with photos",
+    "locale": "en"
+  },
+  "pdp.cta.primary": {
+    "type": "cta",
+    "value": "Shop Aura Frames"
+  },
+  "pdp.cta.weak": {
+    "type": "cta",
+    "value": "Learn more about our frames today"
+  },
+  "meta.description": {
+    "type": "meta",
+    "value": "Aura is a wifi digital photo frame that shows photos sent by text, email, or web upload — no subscription, no app needed for senders."
+  },
+  "claim.no-sub": {
+    "type": "claim",
+    "value": "No subscription required — included with your one-time purchase of Aura Frames."
+  },
+  "claim.ungrounded": {
+    "type": "claim",
+    "value": "Rated 4.8 stars by 12,000 customers."
+  }
+}

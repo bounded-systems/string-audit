@@ -1,0 +1,13 @@
+{
+  "name": "@bounded-systems/string-audit",
+  "version": "0.1.0",
+  "description": "Cost-aware, grounded content auditor — typed string symbols, type-scoped audits, CAS-memoized LLM calls.",
+  "type": "module",
+  "bin": {
+    "string-audit": "audit.mjs"
+  },
+  "scripts": {
+    "audit": "node audit.mjs"
+  },
+  "license": "PolyForm-Noncommercial-1.0.0"
+}
