@@ -15,6 +15,10 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
+import { connect } from "node:net";
+
+// Where the store mounts when it's a socket "door" — inside a room (cf. guest-room).
+export const socketPath = () => process.env.SOCK || join(process.env.ROOM || ".room", "store.sock");
 
 // content address — matches cas.sha256Hex (full hex SHA-256); swap when cas is installed
 const sha256Hex = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -67,6 +71,26 @@ export class CasStore {
   }
 }
 
+// SocketStore — a client for a store mounted on a Unix socket (the "door").
+// Speaks NDJSON {op,key,value}; one short-lived connection per call (lightweight).
+export class SocketStore {
+  constructor(sock) { this.sock = sock; }
+  #rpc(req) {
+    return new Promise((resolve, reject) => {
+      const c = connect(this.sock);
+      let buf = "";
+      c.on("connect", () => c.write(JSON.stringify(req) + "\n"));
+      c.on("data", (d) => { buf += d; const i = buf.indexOf("\n"); if (i >= 0) { c.end(); const m = JSON.parse(buf.slice(0, i)); m.error ? reject(new Error(m.error)) : resolve(m.result); } });
+      c.on("error", reject);
+    });
+  }
+  async has(key) { return this.#rpc({ op: "has", key }); }
+  async get(key) { return this.#rpc({ op: "get", key }); }
+  async put(key, value) { await this.#rpc({ op: "put", key, value }); }
+}
+
 export async function makeStore(fsDir) {
-  return process.env.STORE === "cas" ? new CasStore(join(fsDir, "cas")) : new FsStore(fsDir);
+  if (process.env.STORE === "socket") return new SocketStore(socketPath()); // mounted door, in a room
+  if (process.env.STORE === "cas") return new CasStore(join(fsDir, "cas"));
+  return new FsStore(fsDir);
 }

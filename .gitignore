@@ -1,3 +1,4 @@
 /.cache/
 /.last.json
 /node_modules/
+/.room/

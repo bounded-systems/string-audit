@@ -39,6 +39,19 @@ ANTHROPIC_API_KEY=… node audit.mjs   # real audits — only on cache-misses
 The local `.cache/` (SHA-256 keyed) is already a valid CAS; the `cas` package +
 `anchored-chain` lineage drop in behind the same get/put on the miss path.
 
+## Store backends (`STORE=`)
+Same `get/put/has` port, three backings:
+- **`fs`** (default) — content-addressed file cache.
+- **`cas`** — implements the cas `BlobStore` port (content-addressed bytes, dedup) +
+  an anchored-chain derivation log (input→output lineage).
+- **`socket`** — connects to a **store daemon mounted on a Unix socket, in a room**:
+  ```sh
+  node store-daemon.mjs &              # mounts $ROOM/store.sock (default .room/)
+  STORE=socket node audit.mjs          # audits through the mounted store
+  ```
+  The room (`ROOM=`, default `.room/`) is the mount point — the guest-room-style
+  home for the socket "door"; the CAS blobs/refs/lineage live under `<room>/cas`.
+
 ## Status
 v0.1 — runnable. Deterministic + caching + grounding verified; the Anthropic path is
 implemented (live-verify with a key). See open issues for productionization
