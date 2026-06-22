@@ -11,6 +11,7 @@ import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { auditWithAnthropic } from "./anthropic.mjs";
+import { spellCheck, findOverlaps, spellAvailable } from "./prose.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const AUDIT_VERSION = process.env.AUDIT_VERSION || "1";
@@ -80,7 +81,17 @@ for (const [s, r] of Object.entries(results)) {
   const prev = last[s];
   const d = prev == null ? "" : r.score > prev ? ` ▲+${r.score - prev}` : r.score < prev ? ` ▼${r.score - prev}` : "";
   console.log(`  ${r.cached ? "·" : "✦"} ${s.padEnd(20)} [${r.type.padEnd(8)}] ${r.score}/10${d}`);
-  for (const finding of r.findings) console.log(`       ✗ ${finding}`);
+  const spell = spellCheck(catalog[s].value); // fresh + local, not cached
+  for (const finding of [...r.findings, ...spell]) console.log(`       ✗ ${finding}`);
 }
+
+// overlap — symbols whose copy is duplicated/near-duplicate
+const overlaps = findOverlaps(catalog);
+if (overlaps.length) {
+  console.log("\n  OVERLAP — duplicate copy across symbols");
+  for (const g of overlaps) console.log(`     ⧉ ${g.join("  =  ")}`);
+}
+
 console.log(`\n  cache: ${hits} hit (free) · ${misses} miss (= API calls this run)`);
+console.log(`  spell: ${spellAvailable ? "base wordlist + dictionary.txt" : "dictionary.txt only (set $WORDLIST for typo detection)"}`);
 console.log(`  ✦ computed   · served from CAS\n`);

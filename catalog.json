@@ -23,5 +23,13 @@
   "claim.ungrounded": {
     "type": "claim",
     "value": "Rated 4.8 stars by 12,000 customers."
+  },
+  "pdp.hero.dup": {
+    "type": "headline",
+    "value": "The frame that fills itself with photos"
+  },
+  "pdp.body.intro": {
+    "type": "body",
+    "value": "Photos arrive automaticaly — no app needed for senders."
   }
 }

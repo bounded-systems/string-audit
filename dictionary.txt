@@ -1,0 +1,56 @@
+# Custom dictionary — brand, product, and domain terms the base wordlist won't know.
+# One term per line, lowercase; '#' comments ignored. Spell-check treats these as valid
+# (so brand vocabulary isn't flagged as typos). Define your own here.
+
+# brand / org
+aura
+bounded
+bounded.tools
+robertdelanghe
+guest-room
+prx
+hooksmith
+lone
+ocap
+slsa
+in-toto
+capability
+
+# product (Aura Frames)
+frame
+frames
+wifi
+slideshow
+uploader
+pdp
+nixplay
+skylight
+
+# wearable/health domain (for the cross-brand audit examples)
+spo2
+hrv
+bpm
+wearable
+biometric
+
+# common modern words the dated base wordlist (web2) lacks
+email
+app
+apps
+online
+website
+blog
+login
+signup
+required
+included
+
+# engineering vocabulary the auditor itself uses
+schema
+zod
+deterministic
+memoized
+provenance
+anthropic
+llm
+sha256
