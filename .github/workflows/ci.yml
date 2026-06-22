@@ -19,7 +19,7 @@ jobs:
           node-version: "22"
       - name: Install (wordlist + write-good)
         run: npm ci
-      - name: Test (anthropic path: request shape + parsing)
+      - name: Test — anthropic path (request shape + parsing)
         run: node test.mjs
       - name: Audit (deterministic — spell + grammar + grounding)
         run: node audit.mjs
