@@ -24,8 +24,12 @@ const useLLM = !!process.env.ANTHROPIC_API_KEY; // real audits when keyed; deter
 
 // grounding source — the only facts a `claim` may assert. External + configurable
 // (GROUNDING=<path>); per-catalog grounding is the right production source.
-const groundingFile = process.env.GROUNDING || join(here, "grounding.json");
-const GROUNDED = existsSync(groundingFile) ? JSON.parse(readFileSync(groundingFile, "utf8")) : [];
+const groundingFile = [
+  process.env.GROUNDING,                                                       // explicit
+  process.env.CATALOG && join(dirname(process.env.CATALOG), "grounding.json"), // per-catalog (sibling)
+  join(here, "grounding.json"),                                                // default
+].filter(Boolean).find(existsSync);
+const GROUNDED = groundingFile ? JSON.parse(readFileSync(groundingFile, "utf8")) : [];
 
 const sha = (s) => createHash("sha256").update(s).digest("hex").slice(0, 16);
 const cacheKey = (type, value) => sha(`${AUDIT_VERSION}:${type}:${value}`);
