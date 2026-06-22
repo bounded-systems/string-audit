@@ -3,7 +3,6 @@
 # (so brand vocabulary isn't flagged as typos). Define your own here.
 
 # brand / org
-aura
 bounded
 bounded.tools
 robertdelanghe
@@ -16,15 +15,13 @@ slsa
 in-toto
 capability
 
-# product (Aura Frames)
+# product (digital photo frame)
 frame
 frames
 wifi
 slideshow
 uploader
 pdp
-nixplay
-skylight
 
 # wearable/health domain (for the cross-brand audit examples)
 spo2

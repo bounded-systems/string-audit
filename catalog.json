@@ -6,7 +6,7 @@
   },
   "pdp.cta.primary": {
     "type": "cta",
-    "value": "Shop Aura Frames"
+    "value": "Shop the frame"
   },
   "pdp.cta.weak": {
     "type": "cta",
@@ -14,11 +14,11 @@
   },
   "meta.description": {
     "type": "meta",
-    "value": "Aura is a wifi digital photo frame that shows photos sent by text, email, or web upload — no subscription, no app needed for senders."
+    "value": "A wifi digital photo frame that shows photos sent by text, email, or web upload — no subscription, no app needed for senders."
   },
   "claim.no-sub": {
     "type": "claim",
-    "value": "No subscription required — included with your one-time purchase of Aura Frames."
+    "value": "No subscription required — included with your one-time purchase of the frame."
   },
   "claim.ungrounded": {
     "type": "claim",

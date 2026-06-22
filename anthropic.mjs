@@ -19,7 +19,7 @@ const REPORT_TOOL = {
 };
 
 const system = (type, grounding) =>
-  `You audit a single "${type}" copy string for Aura Frames (a wifi digital photo frame).
+  `You audit a single "${type}" copy string for the frame (a wifi digital photo frame).
 Judge it only for its type (a headline as a headline, a CTA as a CTA, etc.).
 GROUNDING — the ONLY facts you may treat as true: ${grounding.join("; ") || "(none provided)"}.
 Never assert a number, rating, spec, or certification that is not in GROUNDING; if the
