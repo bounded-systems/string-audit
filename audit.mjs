@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { auditWithAnthropic } from "./anthropic.mjs";
 import { spellCheck, grammarCheck, findOverlaps } from "./prose.mjs";
 import { loadCatalog } from "./catalog.mjs";
+import { makeStore } from "./store.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const AUDIT_VERSION = process.env.AUDIT_VERSION || "1";
@@ -21,8 +22,10 @@ mkdirSync(cacheDir, { recursive: true });
 const catalog = loadCatalog(process.env.CATALOG || join(here, "catalog.json")); // CATALOG=<real strings.json> to audit live content
 const useLLM = !!process.env.ANTHROPIC_API_KEY; // real audits when keyed; deterministic otherwise
 
-// grounding source — the only facts a `claim` may assert (stand-in for PDP/spec sheet)
-const GROUNDED = ["no subscription", "one-time purchase", "text", "email", "web upload", "unlimited photos", "wifi", "digital photo frame", "no app"];
+// grounding source — the only facts a `claim` may assert. External + configurable
+// (GROUNDING=<path>); per-catalog grounding is the right production source.
+const groundingFile = process.env.GROUNDING || join(here, "grounding.json");
+const GROUNDED = existsSync(groundingFile) ? JSON.parse(readFileSync(groundingFile, "utf8")) : [];
 
 const sha = (s) => createHash("sha256").update(s).digest("hex").slice(0, 16);
 const cacheKey = (type, value) => sha(`${AUDIT_VERSION}:${type}:${value}`);
@@ -57,17 +60,18 @@ const run = (type, value) => {
   return { score: Math.max(0, 10 - 2 * findings.length), findings };
 };
 
+const store = await makeStore(cacheDir); // FsStore (default) | CasStore (STORE=cas)
 let hits = 0, misses = 0;
 const results = {};
 for (const [symbol, { type, value }] of Object.entries(catalog)) {
-  const f = join(cacheDir, cacheKey(type, value) + ".json");
-  let r, cached;
-  if (existsSync(f)) { r = JSON.parse(readFileSync(f, "utf8")); cached = true; hits++; }
+  const key = cacheKey(type, value);
+  let r = await store.has(key) ? await store.get(key) : null, cached = !!r;
+  if (cached) hits++;
   else {
     // ───── cache MISS: the expensive call. Real Anthropic audit when keyed. ─────
     r = useLLM ? await auditWithAnthropic({ type, value, grounding: GROUNDED }) : run(type, value);
-    writeFileSync(f, JSON.stringify(r));
-    cached = false; misses++;
+    await store.put(key, r);
+    misses++;
   }
   results[symbol] = { type, ...r, cached };
 }
