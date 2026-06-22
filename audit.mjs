@@ -12,12 +12,13 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { auditWithAnthropic } from "./anthropic.mjs";
 import { spellCheck, grammarCheck, findOverlaps } from "./prose.mjs";
+import { loadCatalog } from "./catalog.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const AUDIT_VERSION = process.env.AUDIT_VERSION || "1";
 const cacheDir = join(here, ".cache");
 mkdirSync(cacheDir, { recursive: true });
-const catalog = JSON.parse(readFileSync(join(here, "catalog.json"), "utf8"));
+const catalog = loadCatalog(process.env.CATALOG || join(here, "catalog.json")); // CATALOG=<real strings.json> to audit live content
 const useLLM = !!process.env.ANTHROPIC_API_KEY; // real audits when keyed; deterministic otherwise
 
 // grounding source — the only facts a `claim` may assert (stand-in for PDP/spec sheet)

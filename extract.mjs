@@ -8,11 +8,12 @@
 import { readFileSync } from "node:fs";
 import { dirname, join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadCatalog } from "./catalog.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const file = process.argv[2];
 if (!file) { console.error("usage: node extract.mjs <surface.html>"); process.exit(2); }
-const catalog = JSON.parse(readFileSync(join(here, "catalog.json"), "utf8"));
+const catalog = loadCatalog(process.env.CATALOG || join(here, "catalog.json"));
 
 const html = readFileSync(file, "utf8")
   .replace(/<script[\s\S]*?<\/script>/gi, "")
