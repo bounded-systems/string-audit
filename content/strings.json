@@ -5,6 +5,6 @@
   },
   "description": {
     "type": "meta",
-    "value": "Cost-aware, grounded content auditor — typed string symbols, type-scoped audits, CAS-memoized LLM calls."
+    "value": "A cost-aware, grounded content auditor.  Every string is a named, typed symbol; audits are scoped by type; results are content-hash cached so only changed copy pays for the (expensive) LLM call.  Rewrites can't invent facts — claims are checked against a grounding source, not …"
   }
 }
