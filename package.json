@@ -1,20 +1,11 @@
 {
   "name": "@bounded-systems/string-audit",
-  "version": "0.3.0",
-  "description": "Cost-aware, grounded content auditor — typed string symbols, type-scoped audits, CAS-memoized LLM calls.",
+  "version": "0.0.1",
+  "private": true,
   "type": "module",
-  "bin": {
-    "string-audit": "audit.mjs"
-  },
-  "scripts": {
-    "audit": "node audit.mjs",
-    "extract": "node extract.mjs",
-    "test": "node test.mjs"
-  },
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "description": "Cost-aware, grounded content auditor — typed string symbols, type-scoped audits, CAS-memoized.",
+  "bin": { "string-audit": "./audit.mjs" },
   "dependencies": {
-    "@bounded-systems/anchored-chain": "npm:@jsr/bounded-systems__anchored-chain@^0.2.1",
-    "@bounded-systems/cas": "npm:@jsr/bounded-systems__cas@^0.1.2",
     "an-array-of-english-words": "^2.0.0",
     "write-good": "^1.0.8"
   }
