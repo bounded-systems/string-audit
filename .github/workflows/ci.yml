@@ -53,6 +53,8 @@ jobs:
           echo "$OUT" | grep -q 'coverage'          # tools/call runs extract → structured output
       - name: Registry drift spike smoke-test
         run: node spikes/registry-drift.mjs
+      - name: Concept drift spike smoke-test
+        run: node spikes/concept-drift.mjs
       - name: Install optional CAS backends + textlint for the socket store step
         run: npm install --include=optional --no-audit --no-fund
       - name: Room — mount the socket store + audit through it
