@@ -1,0 +1,66 @@
+# string-audit/.github/workflows/audit.yml — REUSABLE workflow (workflow_call).
+# Lives upstream in bounded-systems/string-audit. Consuming sites call it with a
+# ~5-line caller (see site caller). The gate logic (audit-gate.mjs, prose.mjs-direct,
+# no JSR) lives here too, so fixing a rule once upstream + tagging propagates to every
+# site that bumps the ref. Folds the working blocking gate (prose error + ungrounded
+# claims) the old `audit.mjs || true` never delivered.
+name: audit (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "string-audit ref to run the gate from (tag/sha for reproducibility)."
+        type: string
+        default: "main"
+      build-cmd:
+        description: "Caller command that emits the catalog + grounding into dist/."
+        type: string
+        default: "node build.mjs"
+      catalog:
+        type: string
+        default: "dist/catalog.json"
+      grounding:
+        type: string
+        default: "dist/grounding.json"
+      attested:
+        type: string
+        default: "data/audit/attested-claims.json"
+      strict:
+        description: "Block (exit 1) on error-level prose findings or ungrounded claims."
+        type: boolean
+        default: true
+    secrets:
+      ANTHROPIC_API_KEY:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout caller (the consuming site)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          submodules: recursive
+      - name: Checkout string-audit (gate + prose.mjs)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: bounded-systems/string-audit
+          ref: ${{ inputs.ref }}
+          path: .string-audit
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+      - name: Install caller deps (prose.mjs needs an-array-of-english-words + write-good)
+        run: npm ci --no-audit --no-fund
+      - name: Build (caller emits the catalog + grounding)
+        run: ${{ inputs.build-cmd }}
+      - name: Content gate (prose + grounding)
+        env:
+          CATALOG: ${{ github.workspace }}/${{ inputs.catalog }}
+          GROUNDING: ${{ github.workspace }}/${{ inputs.grounding }}
+          ATTESTED: ${{ github.workspace }}/${{ inputs.attested }}
+        run: node .string-audit/audit-gate.mjs ${{ inputs.strict && '--strict' || '' }}
