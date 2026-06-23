@@ -32,6 +32,16 @@ jobs:
         run: node audit.mjs | grep -q "0 miss"
       - name: Extract + coverage
         run: node extract.mjs samples/page.html
+      - name: MCP — tools/list + tools/call(extract) over stdio
+        run: |
+          OUT=$(printf '%s\n%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"extract","arguments":{"file":"samples/page.html"}}}' \
+            | node mcp.mjs)
+          echo "$OUT"
+          echo "$OUT" | grep -q '"name":"audit"'    # tools/list projects the audit verb
+          echo "$OUT" | grep -q '"name":"extract"'  # ...and the extract verb
+          echo "$OUT" | grep -q 'coverage'          # tools/call runs extract → structured output
       - name: Install optional CAS backends (JSR) for the socket store
         run: npm install --include=optional --no-audit --no-fund
       - name: Room — mount the socket store + audit through it

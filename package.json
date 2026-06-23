@@ -4,11 +4,13 @@
   "description": "Cost-aware, grounded content auditor — typed string symbols, type-scoped audits, CAS-memoized LLM calls.",
   "type": "module",
   "bin": {
-    "string-audit": "audit.mjs"
+    "string-audit": "audit.mjs",
+    "string-audit-mcp": "mcp.mjs"
   },
   "scripts": {
     "audit": "node audit.mjs",
     "extract": "node extract.mjs",
+    "mcp": "node mcp.mjs",
     "test": "node test.mjs"
   },
   "license": "PolyForm-Noncommercial-1.0.0",

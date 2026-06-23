@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import { buildRequest, parseResponse } from "./anthropic.mjs";
 import { aiIsms, overclaims, spellCheck, proofread, readability } from "./prose.mjs";
 import { valeLint, valeEnabled } from "./vale.mjs";
+import { auditVerb, extractVerb, registry } from "./verbs.mjs";
+import { toMcpToolset, toMcpTool, parseArgs } from "@bounded-systems/verbspec";
 
 // request shape
 const req = buildRequest({ type: "headline", value: "Hello world", grounding: ["fact-a", "fact-b"] });
@@ -80,3 +82,24 @@ assert.equal(valeEnabled(), false, "vale provider is off unless AUDIT_VALE is se
 assert.deepEqual(valeLint("anything"), [], "vale provider is a no-op when off / vale absent");
 
 console.log("✓ prose checks verified — { level, msg } + ai-isms + overclaims + proofread + readability + vale gate");
+
+// ── verbspec surfaces: audit + extract as VerbSpecs → CLI + MCP (verbs.mjs) ──────
+const toolset = toMcpToolset(registry);
+assert.deepEqual(toolset.map((t) => t.name).sort(), ["audit", "extract"], "registry projects to the audit + extract MCP toolset");
+assert.ok(toMcpTool(extractVerb).inputSchema.required.includes("file"), "extract MCP tool requires the file argument");
+assert.ok(!toMcpTool(auditVerb).inputSchema.required, "audit MCP tool has no required args (all env-defaulted flags)");
+
+// CLI projection: parseArgs maps the file positional + flags, validated by the Zod input.
+const exInput = parseArgs(extractVerb, ["samples/page.html", "--catalog", "catalog.json"]);
+assert.equal(exInput.file, "samples/page.html", "file positional parsed");
+assert.equal(exInput.catalog, "catalog.json", "--catalog flag parsed");
+
+// extract.run is a pure read → structured `output` (the shape MCP/agents consume); the CLI
+// view is just render(output).
+const ex = extractVerb.run({ file: "samples/page.html" });
+assert.equal(ex.file, "page.html");
+assert.ok(ex.coverage >= 0 && ex.coverage <= 100, "coverage is a percent");
+assert.ok(ex.uncovered.every((u) => u.symbol.startsWith("surface.")), "each uncovered string carries a proposed symbol");
+assert.ok(Array.isArray(ex.unused), "unused catalog symbols listed");
+
+console.log("✓ verbspec surfaces verified — audit/extract VerbSpecs → CLI parse + MCP toolset + structured output");
