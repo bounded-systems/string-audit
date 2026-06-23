@@ -40,6 +40,10 @@ human CLI view, and MCP / agents consume `output` directly:
   The env knobs still work (`CATALOG`, `GROUNDING`, `STORE`, `AUDIT_VERSION`, `AUDIT_VALE`,
   `ANTHROPIC_API_KEY`); flags override the runtime-read ones (`--catalog`, `--grounding`,
   `--store`, `--version`, `--vale`). `--help` is generated from the schema.
+- **Extractor** — `node extract.mjs <surface.html> --emit > content/strings.json` projects
+  every string on a surface to a DTCG token (covered ones reuse their catalog symbol,
+  uncovered get a proposed `surface.*` key) — **bootstrap a catalog from a page**, then
+  refine. Round-trips: the emitted file is a valid `CATALOG=` input.
 - **MCP** — `node mcp.mjs` (the `string-audit-mcp` bin) is a stdio MCP server exposing
   `audit` + `extract` as tools: `tools/list` is the projected toolset, `tools/call`
   validates arguments against the verb's Zod input and runs it. So an agent can audit copy
