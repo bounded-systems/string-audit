@@ -26,7 +26,10 @@ ANTHROPIC_API_KEY=… node audit.mjs   # real audits — only on cache-misses
 - **anthropic** (`anthropic.mjs`) — runs on a cache **miss** when `ANTHROPIC_API_KEY`
   is set. Structured output via tool-use (`{score, findings}`), cost-aware default
   model (`claude-haiku-4-5`, override with `AUDIT_MODEL`), grounding enforced in the
-  system prompt.
+  system prompt. The `report` tool is authored once as a
+  [`verbspec`](https://github.com/bounded-systems/verbspec) `VerbSpec` and projected to
+  the Anthropic tool surface (`toAnthropicTool`), so its schema can't drift from the
+  CLI / MCP projections of the same verb.
 
 ## Copy hygiene — deterministic prose checks
 Run on every symbol, every run (cheap, never cached):
@@ -71,6 +74,7 @@ and grounding/overclaim checking — none of which a prose linter does. See the 
 | hash-keyed result cache | [`cas`](https://github.com/bounded-systems/cas) — bytes by SHA-256 |
 | signed, lineage-tracked derivations | [`anchored-chain`](https://github.com/bounded-systems/anchored-chain) |
 | typed symbol catalog + per-type assertions | [`brand/content`](https://github.com/bounded-systems/brand) |
+| one typed verb → CLI / MCP / Anthropic surfaces | [`verbspec`](https://github.com/bounded-systems/verbspec) — author a verb once, project everywhere |
 | budget awareness | [`prx`](https://github.com/bounded-systems/prx) |
 
 The local `.cache/` (SHA-256 keyed) is already a valid CAS; the `cas` package +
