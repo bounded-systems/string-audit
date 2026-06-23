@@ -13,6 +13,8 @@
   },
   "license": "PolyForm-Noncommercial-1.0.0",
   "dependencies": {
+    "@bounded-systems/anchored-chain": "npm:@jsr/bounded-systems__anchored-chain@^0.2.1",
+    "@bounded-systems/cas": "npm:@jsr/bounded-systems__cas@^0.1.2",
     "an-array-of-english-words": "^2.0.0",
     "write-good": "^1.0.8"
   }

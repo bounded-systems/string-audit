@@ -1,0 +1,33 @@
+name: anthropic
+
+# Live keyed Anthropic audit — real LLM calls, so NOT on push (costs tokens).
+# Manual via the Actions tab, plus a weekly run. Needs the ANTHROPIC_API_KEY repo
+# secret (Settings → Secrets and variables → Actions). Only cache-misses call the
+# API, so cost is bounded to changed copy.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 7 * * 1" # Mondays 07:00 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+      - name: Install
+        run: npm ci
+      - name: Live Anthropic audit (real LLM on cache-miss)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error::Set the ANTHROPIC_API_KEY repo secret to enable the live audit."
+            exit 1
+          fi
+          node audit.mjs
