@@ -77,9 +77,9 @@ export function aiIsms(value) {
   const low = value.toLowerCase();
   const filler = AI_LEXICON.filter((w) => low.includes(w));
   if (filler.length) out.push(`ai-ism: filler — ${filler.slice(0, 4).join(", ")}${filler.length > 4 ? " …" : ""}`);
-  // em-dash cadence: 2+ em/en dashes in one string
+  // em-dash cadence: 3+ em/en dashes — more than a single legitimate parenthetical pair
   const dashes = (value.match(/[—–]/g) || []).length;
-  if (dashes >= 2) out.push(`ai-ism: ${dashes} em-dashes — AI cadence; vary the punctuation`);
+  if (dashes >= 3) out.push(`ai-ism: ${dashes} em-dashes — AI cadence; vary the punctuation`);
   // rule-of-three (a): anaphora — 3+ consecutive clauses opening with the same word
   const clauses = value.split(/[.;:!?—–]\s*|,\s+/).map((c) => c.trim()).filter(Boolean);
   const lead = (c) => (c.match(/^[a-z']+/i) || [""])[0].toLowerCase();
@@ -90,7 +90,13 @@ export function aiIsms(value) {
       break;
     }
   }
-  // rule-of-three (b): adjacent triad — "fast, simple, and reliable"
+  // rule-of-three (b): parallel gerund tricolon — "touching X, running Y, doing Z"
+  let ger = 0;
+  for (const c of clauses) {
+    if (/^[a-z]+ing\b/i.test(c)) { if (++ger >= 3) { out.push(`ai-ism: 3 parallel "-ing" clauses — rule-of-three tricolon`); break; } }
+    else ger = 0;
+  }
+  // rule-of-three (c): adjacent triad — "fast, simple, and reliable"
   const triad = value.match(/\b([a-z]+),\s+([a-z]+),\s+and\s+([a-z]+)\b/i);
   if (triad && [triad[1], triad[2], triad[3]].every((w) => w.length > 2)) {
     out.push(`ai-ism: "${triad[0]}" — rule-of-three triad; vary it`);
@@ -100,19 +106,28 @@ export function aiIsms(value) {
 
 // ── Overclaims (cold-read rule 5: provenance / "Lane C honesty") ─────────────────
 // Absolute, unprovable language — the prose analogue of the grounding check. The cold
-// read's rule: never claim "every privileged effect"; scope the claim or link a source.
+// read's rule is specifically about coverage: never claim "every privileged effect".
+// So an absolute quantifier only fires when it's bound to a coverage/security term —
+// ordinary prose ("never the credential behind it", "doing something you never asked
+// for") is left alone. Plus a few standalone marketing absolutes that are low-FP.
+const COVERAGE =
+  "(?:effect|action|request|write|call|access|tool|command|input|case|secure|safe|signed|enforced|block(?:ed|s)?|protect|prevent|verif|audit|cover|guard)";
 const ABSOLUTES = [
-  [/\bevery\b/i, "every"], [/\balways\b/i, "always"], [/\bnever\b/i, "never"],
-  [/\bguarantee(?:d|s)?\b/i, "guaranteed"], [/\b100\s*%/, "100%"],
-  [/\bcompletely\b/i, "completely"], [/\bentirely\b/i, "entirely"],
-  [/\bany\b[^.?!]{0,20}\b(?:effect|action|task|case|input)\b/i, "any …"],
-  [/\bno\b[^.?!]{0,30}\bever\b/i, "no … ever"],
+  // coverage overclaim — the cold read's "every privileged effect" shape (either order)
+  [new RegExp(`\\b(?:every|all|always|never|any)\\b[^.?!]{0,30}\\b${COVERAGE}`, "i"), "absolute coverage claim — scope it or link a source"],
+  [new RegExp(`\\b${COVERAGE}[a-z]*\\b[^.?!]{0,20}\\b(?:every|all|always|never)\\b`, "i"), "absolute coverage claim — scope it or link a source"],
+  // standalone marketing absolutes (low false-positive)
+  [/\bguarantee(?:d|s)?\b/i, "guaranteed — unprovable absolute"],
+  [/\b100\s*%/, "100% — unprovable absolute"],
+  [/\b(?:completely|entirely|fully|totally)\s+(?:secure|safe|private|protected|covered)\b/i, "absolute security claim"],
+  [/\bno\b[^.?!]{0,30}\bever\b/i, '"no … ever" — absolute claim'],
 ];
 
 export function overclaims(value) {
   const out = [];
-  for (const [re, label] of ABSOLUTES) {
-    if (re.test(value)) out.push(`overclaim: "${label}" — absolute claim; scope it or link a source (Lane C honesty)`);
+  for (const [re, why] of ABSOLUTES) {
+    const m = value.match(re);
+    if (m) out.push(`overclaim: "${m[0].trim().slice(0, 40)}" — ${why} (Lane C honesty)`);
   }
   return out.slice(0, 3);
 }
