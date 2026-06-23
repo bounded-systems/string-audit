@@ -44,7 +44,7 @@ async function handle(req) {
       // so one tool call's config can't leak into the next in this long-lived server.
       const env = { ...process.env };
       try {
-        const output = await v.run(parsed.data, v.deps?.());
+        const output = await v.run(/** @type {any} */ (parsed.data), v.deps?.()); // registry erases per-verb input types
         return ok(id, { content: [{ type: "text", text: JSON.stringify(output, null, 2) }] });
       } catch (e) {
         return errContent(id, String(e?.message ?? e));

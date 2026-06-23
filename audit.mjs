@@ -17,5 +17,6 @@ if (argv.includes("--help") || argv.includes("-h")) {
   console.log(toHelp(auditVerb, "node audit.mjs").replace("node audit.mjs audit", "node audit.mjs"));
   process.exit(0);
 }
-const output = await auditVerb.run(parseArgs(auditVerb, argv));
-process.stdout.write(auditVerb.render(output));
+const input = parseArgs(auditVerb, argv);
+const output = await auditVerb.run(input);
+process.stdout.write(auditVerb.render(output, input));

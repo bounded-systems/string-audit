@@ -125,7 +125,7 @@ export const auditVerb = defineVerb({
 
     return {
       version: AUDIT_VERSION,
-      provider: useLLM ? "anthropic" : "deterministic",
+      provider: /** @type {"anthropic" | "deterministic"} */ (useLLM ? "anthropic" : "deterministic"),
       symbols,
       overlaps: findOverlaps(catalog),
       cache: { hits, misses },
@@ -208,6 +208,7 @@ export const extractVerb = defineVerb({
 
     // every surface string → a DTCG token (covered reuse their catalog symbol; uncovered
     // take the proposed key) so `--emit` can seed/merge a content/strings.json from the page.
+    /** @type {Record<string, { "$value": string, "$type": string, "$description": string }>} */
     const tokens = {};
     for (const f of surface) {
       const key = catVals.get(f.value.toLowerCase()) ?? `surface.${f.where}.${slug(f.value)}`;

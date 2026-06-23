@@ -19,11 +19,11 @@ if (!argv.some((a) => !a.startsWith("--"))) {
   process.exit(2);
 }
 const input = parseArgs(extractVerb, argv);
-const output = extractVerb.run(input);
+const output = await extractVerb.run(input); // run may be sync or async per the VerbSpec type
 if (input.emit) {
   // a DTCG content/strings.json you can redirect into a catalog and refine.
   const doc = { "$description": `Extracted content tokens — ${output.file} (${output.surface} surface strings). Seed/merge into a content/strings.json. ($type drives string-audit's typed audits; drop it for the brand DTCG schema.)`, ...output.tokens };
   process.stdout.write(JSON.stringify(doc, null, 2) + "\n");
 } else {
-  process.stdout.write(extractVerb.render(output));
+  process.stdout.write(extractVerb.render(output, input));
 }

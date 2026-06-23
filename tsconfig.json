@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "checkJs": true,
+    "allowJs": true,
+    "noEmit": true,
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "es2023",
+    "lib": ["es2023"],
+    "types": ["node"],
+    "skipLibCheck": true,
+    "noImplicitAny": false,
+    "strict": false
+  },
+  "include": ["*.mjs"],
+  "exclude": ["test.mjs"]
+}

@@ -13,6 +13,7 @@
     "extract": "node extract.mjs",
     "scan": "node scan.mjs",
     "mcp": "node mcp.mjs",
+    "typecheck": "tsc --noEmit",
     "test": "node test.mjs"
   },
   "license": "PolyForm-Noncommercial-1.0.0",
@@ -29,5 +30,9 @@
     "stemmer": "^2.0.0",
     "textlint": "^14.0.0",
     "textlint-rule-write-good": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
   }
 }
