@@ -57,8 +57,8 @@ jobs:
         run: node spikes/concept-drift.mjs
       - name: Install optional CAS backends + textlint for the socket store step
         run: npm install --include=optional --no-audit --no-fund
-      - name: Concept drift spike — stem-aware mode (optional stemmer now installed)
-        run: node spikes/concept-drift.mjs samples/page.html | grep -q "stem-aware"
+      - name: Concept drift spike — stemmed matching (optional stemmer now installed)
+        run: node spikes/concept-drift.mjs samples/page.html | grep -q "token overlap (stemmed)"
       - name: Room — mount the socket store + audit through it
         run: |
           node store-daemon.mjs &
