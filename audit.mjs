@@ -12,6 +12,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { auditWithAnthropic } from "./anthropic.mjs";
 import { spellCheck, grammarCheck, aiIsms, overclaims, proofread, readability, findOverlaps } from "./prose.mjs";
+import { valeLint } from "./vale.mjs"; // opt-in (AUDIT_VALE=1); no-op otherwise
 import { loadCatalog } from "./catalog.mjs";
 import { makeStore } from "./store.mjs";
 
@@ -93,7 +94,7 @@ for (const [s, r] of Object.entries(results)) {
   const v = catalog[s].value;
   // prose checks carry first-class severity ({ level, msg }); the scored, cached
   // type-audit findings are still strings — classify them into the same model.
-  const prose = [...spellCheck(v), ...grammarCheck(v), ...aiIsms(v), ...overclaims(v), ...proofread(v), ...readability(v, r.type)];
+  const prose = [...spellCheck(v), ...grammarCheck(v), ...aiIsms(v), ...overclaims(v), ...proofread(v), ...readability(v, r.type), ...valeLint(v)];
   const typeLevel = (m) => /UNGROUNDED|grounded/i.test(m) ? "error" : "suggestion";
   const GLYPH = { error: "✗", warn: "⚠", suggestion: "·" }; // cf. Vale severities
   const ORDER = { error: 0, warn: 1, suggestion: 2 };
