@@ -58,6 +58,8 @@ jobs:
         run: node spikes/concept-drift.mjs
       - name: Install optional CAS backends + textlint for the socket store step
         run: npm install --include=optional --no-audit --no-fund
+      - name: Typecheck — tsc --checkJs (no build; full deps so optional import()s resolve)
+        run: npm run typecheck
       - name: Concept drift spike — stemmed matching (optional stemmer now installed)
         run: node spikes/concept-drift.mjs samples/page.html | grep -q "token overlap (stemmed)"
       - name: Scan verb — AST extract + Zod-typed keepers, emit round-trips

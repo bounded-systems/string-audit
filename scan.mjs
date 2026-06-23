@@ -23,5 +23,5 @@ if (input.emit) {
   for (const k of output.keepers) doc[`scan.${k.type}.${slug(k.value)}`] = { "$value": k.value, "$type": k.type, "$description": `from ${k.file}${k.valid ? "" : ` (⚠ ${k.error})`}` };
   process.stdout.write(JSON.stringify(doc, null, 2) + "\n");
 } else {
-  process.stdout.write(scanVerb.render(output));
+  process.stdout.write(scanVerb.render(output, input));
 }

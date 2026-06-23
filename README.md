@@ -55,6 +55,15 @@ human CLI view, and MCP / agents consume `output` directly:
   extract a surface, or scan a tree as a tool call.
 - **Anthropic** — the `report` tool (above) is the same projection (`toAnthropicTool`).
 
+## Types — no build step
+Plain Node ESM (`.mjs`): everything runs directly (`node audit.mjs`) and the consumer site
+vendors `prose.mjs` as **source** — no compile, no `dist/`. The typing that matters is
+**runtime**, via Zod (verbspec inputs, the `report` schema, the per-type contracts in
+[`types.mjs`](types.mjs)). On top, a `tsc --checkJs` pass (`npm run typecheck`, run in CI)
+gives **compile-time** checking over the `.mjs` — type safety without a build step or `.ts`
+files. Libraries that ship to consumers (e.g. verbspec) are TypeScript; this directly-run,
+vendored tool stays `.mjs`.
+
 ## Copy hygiene — deterministic prose checks
 Run on every symbol, every run (cheap, never cached):
 - **spell** — modern wordlist ∪ `dictionary.txt` (brand terms).
