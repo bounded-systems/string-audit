@@ -36,13 +36,30 @@ Run on every symbol, every run (cheap, never cached):
   antithesis, `the easy part … the hard part`, rule-of-three triads, em-dash cadence,
   rhetorical teaser fragments, and buzzword filler (`delve`, `seamless`, `leverage`,
   `unlock`, `robust` …). Each finding names the tell so a human can rewrite it.
-- **overclaims** — absolute, unprovable language (`every`, `always`, `guaranteed`,
-  `100%`); scope the claim or link a source. The prose analogue of the grounding check.
+- **overclaims** — absolute, unprovable language bound to a coverage term (`every
+  privileged effect`, `always enforced`); scope it or link a source. The prose analogue
+  of the grounding check — ordinary `never`/`always` in plain prose is left alone.
+- **proofread** — mechanical slips spell/grammar miss: doubled words, double/stray
+  spaces, space-before-punctuation, missing space after a comma, repeated punctuation,
+  mixed straight + curly quotes. The "was this even proof-read?" tells.
+- **readability** — copy you bounce off: over-long sentences, and (for `body`/`meta`)
+  genuinely dense prose by Flesch reading-ease. A proxy for "why am I reading this?".
 - **overlap** — symbols whose copy is duplicated or near-duplicate.
 
-The ai-ism and overclaim rules come from a cold read of the public copy ("AI-isms make
-me want to die"; "never claim *every* privileged effect"). The keyed Anthropic auditor is
-told the same rules, so the LLM path flags them too.
+Findings carry **severity tiers** (à la Vale): `✗` correctness/honesty (ungrounded,
+typos) · `⚠` ai-ism/proofread · `·` suggestion.
+
+The rules come from a cold read of the public copy ("AI-isms make me want to die"; "not
+sure if proof read"; "never claim *every* privileged effect"). The keyed Anthropic
+auditor is told the same rules, so the LLM path flags them too.
+
+**Prior art.** For AI-tell linting specifically, [Vale](https://github.com/vale-cli/vale)
+\+ [`vale-signs-of-ai-writing`](https://github.com/ammil-industries/vale-signs-of-ai-writing)
+(which implements [Wikipedia's *Signs of AI writing*](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing))
+cover the same ground at larger scale, with confidence tiers. Our lexicon is seeded from
+that corpus; the differentiator here is the typed-symbol catalog, the content-hash cache,
+and grounding/overclaim checking — none of which a prose linter does. See the open
+"adopt Vale" issue for folding the two together.
 
 ## Reuses the bounded-systems stack
 | Need | Primitive |

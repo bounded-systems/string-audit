@@ -3,7 +3,11 @@
 //   grammarCheck — weak-prose / style (write-good)
 //   aiIsms       — formulaic "written by AI" cadences + buzzword filler (cold-read rule 4)
 //   overclaims   — absolute, unprovable language (cold-read rule 5 / Lane C honesty)
+//   proofread    — mechanical defects spell/grammar miss ("was this even proof-read?")
+//   readability  — over-long / dense copy you bounce off ("why am I reading this?")
 //   findOverlaps — symbols whose normalized value collides (dupe/near-dupe copy)
+// Prior art: Vale + ammil-industries/vale-signs-of-ai-writing cover the AI-tell linting
+// at larger scale; see the open "adopt Vale" issue. These stay zero-dep + grounding-aware.
 // Uses a portable modern wordlist (an-array-of-english-words) — no more 1934 web2.
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -22,9 +26,11 @@ const brand = new Set(
 const base = new Set(enWords);
 export const spellAvailable = true;
 const known = (w) => brand.has(w) || base.has(w) || base.has(w.replace(/s$/, "")) || base.has(w.replace(/d$/, "")) || base.has(w.replace(/ing$/, ""));
+// English contractions ("isn't", "we're", "it's") — valid, not misspellings.
+const isContraction = (w) => /^[a-z]+n['’]t$/.test(w) || /^[a-z]+['’](s|re|ve|ll|d|m)$/.test(w);
 
 export function spellCheck(value) {
-  const words = (value.toLowerCase().match(/[a-z][a-z'’]+/g) || []).filter((w) => w.length > 2);
+  const words = (value.toLowerCase().match(/[a-z][a-z'’]+/g) || []).filter((w) => w.length > 2 && !isContraction(w));
   const bad = [...new Set(words.map((w) => w.replace(/['’]s?$/, "")).filter((w) => !known(w)))];
   return bad.length ? [`spelling: ${bad.slice(0, 6).join(", ")}${bad.length > 6 ? " …" : ""} (add to dictionary.txt if valid)`] : [];
 }
@@ -57,7 +63,8 @@ const AI_PATTERNS = [
   [/\bmore than just\b/i, '"more than just" cadence'],
 ];
 
-// Filler/buzzword lexicon AI reaches for (single token or short phrase).
+// Filler/buzzword lexicon AI reaches for (single token or short phrase). Seeded from the
+// Wikipedia "Signs of AI writing" / vale-signs-of-ai-writing corpora + the cold read.
 const AI_LEXICON = [
   "delve", "seamless", "seamlessly", "robust", "leverage", "elevate", "unlock", "harness",
   "realm", "tapestry", "testament", "embark", "foster", "bustling", "supercharge",
@@ -66,6 +73,10 @@ const AI_LEXICON = [
   "ever-evolving", "ever-changing", "look no further", "rest assured", "when it comes to",
   "dive in", "deep dive", "in today's fast-paced", "fast-paced world", "needless to say",
   "it's worth noting", "the world of", "unleash", "turbocharge",
+  // transitional / hedging tells (the "Furthermore, Moreover" cadence)
+  "furthermore", "moreover", "in conclusion", "it is important to note", "navigate the",
+  "meticulous", "meticulously", "underscore", "pivotal", "vibrant", "landscape of",
+  "in the realm of", "a testament to", "stand out from the crowd", "take it to the next level",
 ];
 
 export function aiIsms(value) {
@@ -128,6 +139,44 @@ export function overclaims(value) {
   for (const [re, why] of ABSOLUTES) {
     const m = value.match(re);
     if (m) out.push(`overclaim: "${m[0].trim().slice(0, 40)}" — ${why} (Lane C honesty)`);
+  }
+  return out.slice(0, 3);
+}
+
+// ── Proofreading (cold-read: "not sure if proof read") ──────────────────────────
+// High-confidence mechanical defects spell/grammar miss — the "was this even
+// proof-read?" tells. Conservative on purpose: every rule here should be a real slip.
+export function proofread(value) {
+  const out = [];
+  const dup = value.match(/\b([a-z]{2,})\s+\1\b/i);
+  if (dup) out.push(`proofread: doubled word "${dup[1]} ${dup[1]}"`);
+  if (/ {2,}/.test(value)) out.push("proofread: double space");
+  if (/\s[,.;:!?]/.test(value)) out.push("proofread: space before punctuation");
+  if (/[a-z],[a-z]/i.test(value)) out.push("proofread: missing space after comma");
+  if (/[!?]{2,}/.test(value) || /\.{4,}/.test(value)) out.push("proofread: repeated punctuation");
+  if (/['"]/.test(value) && /[‘’“”]/.test(value)) out.push("proofread: mixed straight + curly quotes");
+  if (/^\s|\s$/.test(value)) out.push("proofread: leading/trailing whitespace");
+  return out;
+}
+
+// ── Readability (cold-read: "why am I reading this" — couldn't parse it) ─────────
+// Flags copy you bounce off: over-long sentences, and (for body/meta) genuinely dense
+// prose by Flesch reading-ease. A deterministic proxy for "I didn't get through this".
+const syllables = (w) => Math.max(1, (w.toLowerCase().replace(/e$/, "").match(/[aeiouy]+/g) || []).length);
+export function readability(value, type = "body") {
+  const out = [];
+  const sentences = value.split(/[.!?]+\s+|[.!?]+$/).map((s) => s.trim()).filter(Boolean);
+  for (const s of sentences) {
+    const n = (s.match(/\b[\w'-]+\b/g) || []).length;
+    if (n > 28) out.push(`readability: long sentence (${n} words) — hard to scan; split it`);
+  }
+  if ((type === "body" || type === "meta") && sentences.length) {
+    const words = value.match(/\b[\w'-]+\b/g) || [];
+    if (words.length >= 12) {
+      const syl = words.reduce((a, w) => a + syllables(w), 0);
+      const fre = 206.835 - 1.015 * (words.length / sentences.length) - 84.6 * (syl / words.length);
+      if (fre < 35) out.push(`readability: dense prose (reading ease ${Math.round(fre)}/100) — shorter words + sentences`);
+    }
   }
   return out.slice(0, 3);
 }
