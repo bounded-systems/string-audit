@@ -14,7 +14,7 @@ zero-dep and runnable on its own.
 | Spike | What it explores | Run |
 |---|---|---|
 | `vale-rules.mjs` | Data-driven scan over the (now root) `ai-tells.json` returning **structured `{ level, msg }`** findings — the shape `prose.mjs` adopted. (Production reads the same file; this is just a standalone demo.) | `node spikes/vale-rules.mjs` |
-| `registry-drift.mjs` | **[#22] schema-aware drift check** — flags copy referencing a `--flag` or enum value that isn't in the verbspec registry (`verbs.mjs`): renamed/removed/typo'd surface = a correctness `error`. Pure + zero-dep (takes a `vocab`); `vocabFromRegistry(registry)` is the wire-up adapter. The differentiated check no off-the-shelf linter does. | `node spikes/registry-drift.mjs` |
+| ~~`registry-drift.mjs`~~ | **Promoted → `prose.mjs`** ([#22]). `registryDrift(value, vocab)` + `vocabFromSchemas(schemas)` now ship; `verbs.mjs` builds the vocab from the projected verb schemas (`toMcpTool(...).inputSchema`) and runs it in the prose pass as an `error`-level gate. | (in production) |
 
 ## The direction these point at
 

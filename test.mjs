@@ -2,7 +2,7 @@
 // shape + response parsing (the live call itself is a keyed run, not tested here).
 import assert from "node:assert/strict";
 import { buildRequest, parseResponse } from "./anthropic.mjs";
-import { aiIsms, overclaims, spellCheck, proofread, readability } from "./prose.mjs";
+import { aiIsms, overclaims, spellCheck, proofread, readability, registryDrift, vocabFromSchemas } from "./prose.mjs";
 import { valeLint, valeEnabled } from "./vale.mjs";
 import { auditVerb, extractVerb, registry } from "./verbs.mjs";
 import { toMcpToolset, toMcpTool, parseArgs } from "@bounded-systems/verbspec";
@@ -82,6 +82,21 @@ assert.equal(valeEnabled(), false, "vale provider is off unless AUDIT_VALE is se
 assert.deepEqual(valeLint("anything"), [], "vale provider is a no-op when off / vale absent");
 
 console.log("✓ prose checks verified — { level, msg } + ai-isms + overclaims + proofread + readability + vale gate");
+
+// ── prose: registry-drift (#22) — copy vs the verbspec registry ─────────────────
+const driftVocab = vocabFromSchemas([
+  { properties: { catalog: {}, store: { enum: ["fs", "cas", "socket"] }, vale: {} } },
+  { properties: { file: {}, catalog: {} } },
+]);
+assert.ok(driftVocab.flags.has("catalog") && driftVocab.flags.has("store") && driftVocab.flags.has("file"), "vocab gathers flags from the projected schemas");
+assert.deepEqual([...driftVocab.enums.store].sort(), ["cas", "fs", "socket"], "vocab captures enum options");
+assert.ok(hits(registryDrift("use the --cache flag", driftVocab), /--cache/), "flags a --flag not in the registry");
+assert.ok(hits(registryDrift("set STORE=redis", driftVocab), /redis/), "flags an invalid enum value");
+assert.ok(registryDrift("use --cache", driftVocab).every((f) => f.level === "error"), "drift is error-level");
+assert.equal(registryDrift("pass --catalog and --store=cas", driftVocab).length, 0, "valid flags + enum → no drift");
+assert.equal(registryDrift("a wifi photo frame — no app needed", driftVocab).length, 0, "ordinary prose (em-dash) → no drift");
+assert.equal(registryDrift("use --cache", vocabFromSchemas([])).length, 0, "empty vocab → no-op (never false-positive)");
+console.log("✓ registry-drift verified — flag + enum drift vs the verbspec registry");
 
 // ── verbspec surfaces: audit + extract as VerbSpecs → CLI + MCP (verbs.mjs) ──────
 const toolset = toMcpToolset(registry);

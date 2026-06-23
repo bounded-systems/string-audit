@@ -8,9 +8,9 @@ import { createHash } from "node:crypto";
 import { dirname, join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { defineVerb } from "@bounded-systems/verbspec";
+import { defineVerb, toMcpTool } from "@bounded-systems/verbspec";
 import { auditWithAnthropic } from "./anthropic.mjs";
-import { spellCheck, grammarCheck, aiIsms, overclaims, proofread, readability, findOverlaps } from "./prose.mjs";
+import { spellCheck, grammarCheck, aiIsms, overclaims, proofread, readability, registryDrift, vocabFromSchemas, findOverlaps } from "./prose.mjs";
 import { valeLint } from "./vale.mjs";
 import { loadCatalog } from "./catalog.mjs";
 import { makeStore } from "./store.mjs";
@@ -121,11 +121,14 @@ export const auditVerb = defineVerb({
     writeFileSync(lastFile, JSON.stringify(Object.fromEntries(Object.entries(results).map(([s, r]) => [s, r.score]))));
 
     const typeLevel = (m) => /UNGROUNDED|grounded/i.test(m) ? "error" : "suggestion";
+    // drift vocab — built once from the projected verb schemas (this same registry);
+    // copy naming a --flag / enum value not in it has drifted from the real surface (#22).
+    const driftVocab = vocabFromSchemas(Object.values(registry).map((vb) => toMcpTool(vb).inputSchema));
     const symbols = Object.entries(results).map(([s, r]) => {
       const v = catalog[s].value;
       // prose checks carry first-class severity ({ level, msg }); the scored, cached
       // type-audit findings are strings — classify them into the same model + sort.
-      const prose = [...spellCheck(v), ...grammarCheck(v), ...aiIsms(v), ...overclaims(v), ...proofread(v), ...readability(v, r.type), ...valeLint(v)];
+      const prose = [...spellCheck(v), ...grammarCheck(v), ...aiIsms(v), ...overclaims(v), ...proofread(v), ...readability(v, r.type), ...registryDrift(v, driftVocab), ...valeLint(v)];
       const findings = [...r.findings.map((m) => ({ level: typeLevel(m), msg: m })), ...prose]
         .sort((a, b) => ORDER[a.level] - ORDER[b.level]);
       const prev = last[s];

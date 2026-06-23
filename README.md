@@ -65,6 +65,9 @@ Run on every symbol, every run (cheap, never cached):
   mixed straight + curly quotes. The "was this even proof-read?" tells.
 - **readability** — copy you bounce off: over-long sentences, and (for `body`/`meta`)
   genuinely dense prose by Flesch reading-ease. A proxy for "why am I reading this?".
+- **registry-drift** — copy that names a `--flag` or enum value not in the verbspec
+  registry (`verbs.mjs`) — renamed/removed/typo'd surface = an `error`. The vocab is built
+  from the projected verb schemas; the schema-aware check no off-the-shelf linter does (#22).
 - **overlap** — symbols whose copy is duplicated or near-duplicate.
 
 Every finding carries a first-class **severity** `{ level, msg }` — `error` `✗`
@@ -109,8 +112,10 @@ Same `get/put/has` port, three backings:
   home for the socket "door"; the CAS blobs/refs/lineage live under `<room>/cas`.
 
 ## Status
-v0.4.0 — runnable. Deterministic + caching + grounding verified; the Anthropic path is
-implemented (live-verify with a key). `audit`/`extract` are authored once as
+v0.4.1 — runnable. Deterministic + caching + grounding verified; the Anthropic path is
+implemented (live-verify with a key). Copy is also checked against the verbspec registry
+itself (**registry-drift**, #22) — a `--flag`/enum value the surface no longer has is an
+`error`. `audit`/`extract` are authored once as
 [`verbspec`](https://github.com/bounded-systems/verbspec) `VerbSpec`s and projected to CLI
 + MCP (the `string-audit-mcp` bin); the `report` tool is the same projection (#18, #19).
 Copy-hygiene suite (ai-isms, overclaims, proofread, readability) with data-driven

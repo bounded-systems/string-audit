@@ -159,6 +159,50 @@ export function readability(value, type = "body") {
   return out.slice(0, 3);
 }
 
+// ── Registry drift (issue #22) — copy vs the verbspec registry ───────────────────
+// string-audit owns a typed registry (verbs.mjs). Copy that names a `--flag` or an enum
+// value not in the registry has drifted from the actual surface (renamed/removed/typo'd)
+// — a correctness defect, like an ungrounded claim. Pure: takes a `vocab`, so prose.mjs
+// stays free of verbspec/zod; verbs.mjs builds the vocab from the projected verb schemas
+// (toMcpTool(...).inputSchema — JSON Schema: `properties` keys + per-prop `enum`).
+export function vocabFromSchemas(schemas) {
+  const flags = new Set(["help", "version"]); // always-valid globals
+  const enums = {};
+  for (const s of schemas) {
+    for (const [name, prop] of Object.entries(s?.properties ?? {})) {
+      flags.add(name.toLowerCase());
+      if (Array.isArray(prop?.enum)) enums[name.toLowerCase()] = new Set(prop.enum.map((x) => String(x).toLowerCase()));
+    }
+  }
+  return { flags, enums };
+}
+
+const DRIFT_FLAG = /(?<![\w-])--([a-z][a-z0-9-]*)/gi; // a CLI flag, not a prose double-hyphen
+const driftEnumRef = (name) => new RegExp(`\\b(?:--${name}[ =]|${name.toUpperCase()}=)([a-z][a-z0-9-]*)`, "gi");
+
+export function registryDrift(value, vocab) {
+  if (!vocab || !vocab.flags || vocab.flags.size <= 2) return []; // no vocab → no-op, never false-positive
+  const out = [];
+  const seen = new Set();
+  for (const m of value.matchAll(DRIFT_FLAG)) {
+    const flag = m[1].toLowerCase();
+    if (!vocab.flags.has(flag) && !seen.has("f:" + flag)) {
+      seen.add("f:" + flag);
+      out.push({ level: "error", msg: `registry-drift: --${flag} is not a flag of any verb (renamed/removed/typo?)` });
+    }
+  }
+  for (const [name, allowed] of Object.entries(vocab.enums || {})) {
+    for (const m of value.matchAll(driftEnumRef(name))) {
+      const val = m[1].toLowerCase();
+      if (!allowed.has(val) && !seen.has(`e:${name}:${val}`)) {
+        seen.add(`e:${name}:${val}`);
+        out.push({ level: "error", msg: `registry-drift: ${name}=${val} — not a valid value (${[...allowed].join("|")})` });
+      }
+    }
+  }
+  return out;
+}
+
 export function findOverlaps(catalog) {
   const byNorm = {};
   for (const [sym, { value }] of Object.entries(catalog)) {
