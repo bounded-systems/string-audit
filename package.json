@@ -23,6 +23,7 @@
   "optionalDependencies": {
     "@bounded-systems/anchored-chain": "npm:@jsr/bounded-systems__anchored-chain@^0.2.1",
     "@bounded-systems/cas": "npm:@jsr/bounded-systems__cas@^0.1.2",
+    "acorn": "^8.0.0",
     "stemmer": "^2.0.0",
     "textlint": "^14.0.0",
     "textlint-rule-write-good": "^2.0.0"
