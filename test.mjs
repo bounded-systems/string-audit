@@ -2,6 +2,7 @@
 // shape + response parsing (the live call itself is a keyed run, not tested here).
 import assert from "node:assert/strict";
 import { buildRequest, parseResponse } from "./anthropic.mjs";
+import { aiIsms, overclaims } from "./prose.mjs";
 
 // request shape
 const req = buildRequest({ type: "headline", value: "Hello world", grounding: ["fact-a", "fact-b"] });
@@ -18,3 +19,18 @@ assert.deepEqual(ok.findings, ["x"]);
 assert.throws(() => parseResponse({ content: [{ type: "text", text: "no tool" }] }), /no tool_use/, "rejects a non-tool response");
 
 console.log("✓ anthropic path verified — request shape + response parsing (no live call)");
+
+// ── prose: AI-isms (cold-read rule 4) ──────────────────────────────────────────
+assert.ok(aiIsms("It isn't a frame — it's a window.").some((f) => /antithesis/.test(f)), "catches \"it isn't X — it's Y\"");
+assert.ok(aiIsms("Setup is the easy part.").some((f) => /easy.*part/i.test(f)), "catches \"the easy part\" framing");
+assert.ok(aiIsms("Fast, simple, and reliable.").some((f) => /rule-of-three/.test(f)), "catches rule-of-three triad");
+assert.ok(aiIsms("We leverage a robust, seamless platform.").some((f) => /filler/.test(f)), "catches buzzword filler");
+assert.ok(aiIsms("Built it — shipped it — loved it — done.").some((f) => /em-dash/.test(f)), "catches em-dash cadence");
+assert.equal(aiIsms("The frame that fills itself with photos").length, 0, "clean copy → no ai-isms");
+
+// ── prose: overclaims (cold-read rule 5 / Lane C honesty) ───────────────────────
+assert.ok(overclaims("Secures every privileged effect.").some((f) => /every/.test(f)), "flags \"every\" overclaim");
+assert.ok(overclaims("Guaranteed to work, always.").length >= 1, "flags guaranteed/always");
+assert.equal(overclaims("No subscription required.").length, 0, "scoped copy → no overclaim");
+
+console.log("✓ prose checks verified — ai-isms + overclaims");

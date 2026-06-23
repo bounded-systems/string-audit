@@ -31,5 +31,9 @@
   "pdp.body.intro": {
     "type": "body",
     "value": "Photos arrive automaticaly — no app needed for senders."
+  },
+  "pdp.body.aiism": {
+    "type": "body",
+    "value": "It isn't just a frame — it's a story. Setup is the easy part; the hard part is remembering to print. Fast, simple, and beautiful."
   }
 }
