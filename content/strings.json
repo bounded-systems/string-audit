@@ -1,0 +1,10 @@
+{
+  "name": {
+    "type": "name",
+    "value": "String Audit"
+  },
+  "description": {
+    "type": "meta",
+    "value": "Cost-aware, grounded content auditor — typed string symbols, type-scoped audits, CAS-memoized LLM calls."
+  }
+}
