@@ -1,0 +1,3 @@
+[submodule "vendor/brand"]
+	path = vendor/brand
+	url = https://github.com/bounded-systems/brand.git
