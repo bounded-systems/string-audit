@@ -36,6 +36,11 @@ jobs:
         run: node audit.mjs | grep -q "0 miss"
       - name: Extract + coverage
         run: node extract.mjs samples/page.html
+      - name: Extract --emit — DTCG catalog round-trips into audit
+        run: |
+          node extract.mjs samples/page.html --emit > /tmp/extracted.json
+          node -e 'const o=require("/tmp/extracted.json");const n=Object.keys(o).filter(k=>!k.startsWith("$")).length;if(!n){console.error("no tokens");process.exit(1)}console.log(n+" tokens emitted")'
+          CATALOG=/tmp/extracted.json node audit.mjs > /dev/null  # audits the extracted catalog
       - name: MCP — tools/list + tools/call(extract) over stdio
         run: |
           OUT=$(printf '%s\n%s\n' \

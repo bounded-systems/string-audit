@@ -129,4 +129,10 @@ assert.ok(ex.coverage >= 0 && ex.coverage <= 100, "coverage is a percent");
 assert.ok(ex.uncovered.every((u) => u.symbol.startsWith("surface.")), "each uncovered string carries a proposed symbol");
 assert.ok(Array.isArray(ex.unused), "unused catalog symbols listed");
 
-console.log("✓ verbspec surfaces verified — audit/extract VerbSpecs → CLI parse + MCP toolset + structured output");
+// extractor: --emit projects every surface string to a DTCG token (bootstrap a catalog)
+assert.equal(Object.keys(ex.tokens).length, ex.surface, "one token per surface string");
+assert.ok(Object.values(ex.tokens).every((t) => t["$value"] && t["$type"] && t["$description"]), "tokens are DTCG { $value, $type, $description }");
+assert.ok(Object.keys(ex.tokens).some((k) => k.startsWith("surface.")), "uncovered strings get a proposed surface.* key");
+assert.ok("tagline" in ex.tokens, "a covered string reuses its catalog symbol (tagline), not a proposed key");
+
+console.log("✓ verbspec surfaces verified — audit/extract VerbSpecs → CLI parse + MCP toolset + structured output + extractor");

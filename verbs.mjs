@@ -192,6 +192,7 @@ export const extractVerb = defineVerb({
   input: z.object({
     file: z.string().describe("Path to the HTML surface to scan."),
     catalog: z.string().optional().describe("Path to the typed-symbol catalog (default $CATALOG or the vendored brand registry, vendor/brand/content/strings.json)."),
+    emit: z.boolean().optional().describe("Emit a DTCG content/strings.json of the surface's strings (instead of the coverage report) — bootstrap a catalog from a page."),
   }),
   positionals: ["file"],
   output: z.object({
@@ -201,6 +202,9 @@ export const extractVerb = defineVerb({
     covered: z.number(),
     uncovered: z.array(z.object({ value: z.string(), type: z.string(), where: z.string(), symbol: z.string() })),
     unused: z.array(z.string()),
+    // DTCG tokens for every surface string (covered reuse their catalog symbol, uncovered
+    // get the proposed key) — what `--emit` writes, and what MCP callers get to seed a catalog.
+    tokens: z.record(z.string(), z.object({ "$value": z.string(), "$type": z.string(), "$description": z.string() })),
   }),
   run: (input) => {
     const catalogPath = input.catalog ?? process.env.CATALOG ?? DEFAULT_CATALOG;
@@ -226,6 +230,14 @@ export const extractVerb = defineVerb({
       .map((f) => ({ value: f.value, type: f.type, where: f.where, symbol: `surface.${f.where}.${slug(f.value)}` }));
     const unused = Object.entries(catalog).filter(([, { value }]) => !surfaceVals.has(normHtml(value).toLowerCase())).map(([s]) => s);
 
+    // every surface string → a DTCG token (covered reuse their catalog symbol; uncovered
+    // take the proposed key) so `--emit` can seed/merge a content/strings.json from the page.
+    const tokens = {};
+    for (const f of surface) {
+      const key = catVals.get(f.value.toLowerCase()) ?? `surface.${f.where}.${slug(f.value)}`;
+      tokens[key] = { "$value": f.value, "$type": f.type, "$description": `extracted from ${basename(input.file)} (<${f.where}>)` };
+    }
+
     return {
       file: basename(input.file),
       coverage: surface.length ? Math.round((coveredArr.length / surface.length) * 100) : 100,
@@ -233,6 +245,7 @@ export const extractVerb = defineVerb({
       covered: coveredArr.length,
       uncovered,
       unused,
+      tokens,
     };
   },
   render: (out) => {
