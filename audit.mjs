@@ -91,14 +91,15 @@ for (const [s, r] of Object.entries(results)) {
   const d = prev == null ? "" : r.score > prev ? ` ▲+${r.score - prev}` : r.score < prev ? ` ▼${r.score - prev}` : "";
   console.log(`  ${r.cached ? "·" : "✦"} ${s.padEnd(20)} [${r.type.padEnd(8)}] ${r.score}/10${d}`);
   const v = catalog[s].value;
-  const prose = [...spellCheck(v), ...grammarCheck(v), ...aiIsms(v), ...overclaims(v), ...proofread(v), ...readability(v, r.type)]; // fresh, not cached
-  // severity tiers (cf. Vale): ✗ correctness/honesty · ⚠ AI-ism/proofread · · suggestion
-  const tier = (m) =>
-    /^(overclaim:|UNGROUNDED|spelling:)/i.test(m) || /\bgrounded\b/i.test(m) ? "✗" :
-    /^(ai-ism:|proofread:)/i.test(m) ? "⚠" : "·";
-  const rank = { "✗": 0, "⚠": 1, "·": 2 };
-  for (const [g, m] of [...r.findings, ...prose].map((m) => [tier(m), m]).sort((a, b) => rank[a[0]] - rank[b[0]]))
-    console.log(`       ${g} ${m}`);
+  // prose checks carry first-class severity ({ level, msg }); the scored, cached
+  // type-audit findings are still strings — classify them into the same model.
+  const prose = [...spellCheck(v), ...grammarCheck(v), ...aiIsms(v), ...overclaims(v), ...proofread(v), ...readability(v, r.type)];
+  const typeLevel = (m) => /UNGROUNDED|grounded/i.test(m) ? "error" : "suggestion";
+  const GLYPH = { error: "✗", warn: "⚠", suggestion: "·" }; // cf. Vale severities
+  const ORDER = { error: 0, warn: 1, suggestion: 2 };
+  const findings = [...r.findings.map((m) => ({ level: typeLevel(m), msg: m })), ...prose]
+    .sort((a, b) => ORDER[a.level] - ORDER[b.level]);
+  for (const f of findings) console.log(`       ${GLYPH[f.level]} ${f.msg}`);
 }
 
 // overlap — symbols whose copy is duplicated/near-duplicate
