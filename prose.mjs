@@ -167,3 +167,78 @@ export function findOverlaps(catalog) {
   }
   return Object.values(byNorm).filter((g) => g.length > 1);
 }
+
+// ── Registry-aware drift check (issue #22, Direction 2) ──────────────────────
+// Promoted from spikes/registry-drift.mjs. Flags copy that references a --flag,
+// ENUM=value, or backtick-wrapped command that isn't in the live verbspec registry
+// (renamed/removed/typo'd) — a correctness defect, same tier as UNGROUNDED.
+//
+// Decision: in-house over retext (spikes/registry-drift.mjs decision memo).
+//   retext: 35-dep chain, AST, autofix — overkill for flag/token matching.
+//   In-house: zero deps, the registry is already the typed source of truth.
+//
+// prose.mjs must not import verbs.mjs (circular). Callers pass a `vocab` built by
+// vocabFromRegistry() before calling into the prose pipeline.
+
+const FLAG_RE = /(?<![\w-])--([a-z][a-z0-9-]*)/gi;
+const enumRef = (name) => new RegExp(`\\b(?:--${name}[ =]|${name.toUpperCase()}=)([a-z][a-z0-9-]*)`, "gi");
+const BACKTICK_RE = /`([^`]+)`/g;
+const BIN_VERB_RE = /^([\w][\w-]*)\s+([\w][\w-]*)$/;
+
+// Adapter: build the vocab from a verbspec registry (verbs.mjs format).
+// Call this once per audit run and pass the result to registryDrift().
+export function vocabFromRegistry(reg) {
+  if (!reg) return null;
+  const verbIds = new Set(Object.keys(reg));
+  const flags = new Set(["help", "version"]);
+  const enums = {};
+  const bins = new Set(["string-audit", "string-audit-mcp"]);
+  for (const verb of Object.values(reg)) {
+    try {
+      const shape = verb.input?.shape ?? verb.input?._def?.shape?.() ?? {};
+      for (const [name, field] of Object.entries(shape)) {
+        flags.add(name);
+        const opts = field?.options ?? field?._def?.entries ?? field?._def?.values;
+        if (opts) enums[name] = new Set(Array.isArray(opts) ? opts : Object.values(opts));
+      }
+    } catch { /* verbspec version differences */ }
+  }
+  return { verbIds, flags, enums, bins };
+}
+
+export function registryDrift(value, type, vocab) {
+  if (!vocab || !["body", "headline", "subhead", "title"].includes(type)) return [];
+  const { verbIds, flags, enums, bins } = vocab;
+  const out = [];
+  const seen = new Set();
+
+  // ── plain prose: --flag references ─────────────────────────────────────────
+  for (const m of value.matchAll(FLAG_RE)) {
+    const flag = m[1].toLowerCase();
+    if (!flags.has(flag) && !seen.has("f:" + flag)) {
+      seen.add("f:" + flag);
+      out.push({ level: "error", msg: `registry-drift: --${flag} — not a flag of any verb (renamed/removed/typo?)` });
+    }
+  }
+  // ── plain prose: ENUM=value references ─────────────────────────────────────
+  for (const [name, allowed] of Object.entries(enums)) {
+    for (const m of value.matchAll(enumRef(name))) {
+      const val = m[1].toLowerCase();
+      if (!allowed.has(val) && !seen.has(`e:${name}:${val}`)) {
+        seen.add(`e:${name}:${val}`);
+        out.push({ level: "error", msg: `registry-drift: ${name}=${val} — not a valid value (${[...allowed].join("|")})` });
+      }
+    }
+  }
+  // ── code-formatted copy: backtick-wrapped tokens ────────────────────────────
+  for (const [, tok] of value.matchAll(BACKTICK_RE)) {
+    const binVerbMatch = tok.match(BIN_VERB_RE);
+    if (binVerbMatch) {
+      const [, bin, verb] = binVerbMatch;
+      if (!bins.has(bin)) out.push({ level: "error", msg: `registry-drift: \`${bin}\` — unknown bin (known: ${[...bins].join(", ")})` });
+      else if (!verbIds.has(verb)) out.push({ level: "error", msg: `registry-drift: \`${verb}\` — verb not in registry (known: ${[...verbIds].join(", ")})` });
+    }
+    // single-word backtick tokens: already caught by the --flag path above if they have a -- prefix
+  }
+  return out.slice(0, 5);
+}

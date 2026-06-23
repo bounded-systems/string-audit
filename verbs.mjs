@@ -10,8 +10,9 @@ import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { defineVerb } from "@bounded-systems/verbspec";
 import { auditWithAnthropic } from "./anthropic.mjs";
-import { spellCheck, grammarCheck, aiIsms, overclaims, proofread, readability, findOverlaps } from "./prose.mjs";
+import { spellCheck, grammarCheck, aiIsms, overclaims, proofread, readability, findOverlaps, registryDrift, vocabFromRegistry } from "./prose.mjs";
 import { valeLint } from "./vale.mjs";
+import { textlintLint } from "./textlint.mjs";
 import { loadCatalog } from "./catalog.mjs";
 import { makeStore } from "./store.mjs";
 
@@ -121,16 +122,25 @@ export const auditVerb = defineVerb({
     writeFileSync(lastFile, JSON.stringify(Object.fromEntries(Object.entries(results).map(([s, r]) => [s, r.score]))));
 
     const typeLevel = (m) => /UNGROUNDED|grounded/i.test(m) ? "error" : "suggestion";
-    const symbols = Object.entries(results).map(([s, r]) => {
+    // Build the registry vocab once (not per-symbol) so registryDrift stays pure/no-import.
+    const vocab = vocabFromRegistry(registry);
+    // textlintLint is async (dynamic import); all others are sync. Run async prose in parallel,
+    // sync prose inline. The map returns Promises, which we settle via Promise.all.
+    const symbols = await Promise.all(Object.entries(results).map(async ([s, r]) => {
       const v = catalog[s].value;
       // prose checks carry first-class severity ({ level, msg }); the scored, cached
       // type-audit findings are strings — classify them into the same model + sort.
-      const prose = [...spellCheck(v), ...grammarCheck(v), ...aiIsms(v), ...overclaims(v), ...proofread(v), ...readability(v, r.type), ...valeLint(v)];
+      const prose = [
+        ...spellCheck(v), ...grammarCheck(v), ...aiIsms(v), ...overclaims(v),
+        ...proofread(v), ...readability(v, r.type), ...valeLint(v),
+        ...(await textlintLint(v)),
+        ...registryDrift(v, r.type, vocab),
+      ];
       const findings = [...r.findings.map((m) => ({ level: typeLevel(m), msg: m })), ...prose]
         .sort((a, b) => ORDER[a.level] - ORDER[b.level]);
       const prev = last[s];
       return { symbol: s, type: r.type, score: r.score, cached: r.cached, delta: prev == null ? null : r.score - prev, findings };
-    });
+    }));
 
     return {
       version: AUDIT_VERSION,
@@ -154,7 +164,7 @@ export const auditVerb = defineVerb({
       for (const g of out.overlaps) lines.push(`     ⧉ ${g.join("  =  ")}`);
     }
     lines.push(`\n  cache: ${out.cache.hits} hit (free) · ${out.cache.misses} miss (= API calls this run)`);
-    lines.push(`  prose: spell + grammar + ai-isms + overclaims + proofread + readability (uncached)`);
+    lines.push(`  prose: spell + grammar + ai-isms + overclaims + proofread + readability + registry-drift (uncached)`);
     lines.push(`  tiers: ✗ correctness/honesty · ⚠ ai-ism/proofread · · suggestion`);
     lines.push(`  ✦ computed   · served from CAS\n`);
     return lines.map((l) => l + "\n").join("");

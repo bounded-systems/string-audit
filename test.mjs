@@ -2,8 +2,9 @@
 // shape + response parsing (the live call itself is a keyed run, not tested here).
 import assert from "node:assert/strict";
 import { buildRequest, parseResponse } from "./anthropic.mjs";
-import { aiIsms, overclaims, spellCheck, proofread, readability } from "./prose.mjs";
+import { aiIsms, overclaims, spellCheck, proofread, readability, registryDrift, vocabFromRegistry } from "./prose.mjs";
 import { valeLint, valeEnabled } from "./vale.mjs";
+import { textlintEnabled, textlintLint } from "./textlint.mjs";
 import { auditVerb, extractVerb, registry } from "./verbs.mjs";
 import { toMcpToolset, toMcpTool, parseArgs } from "@bounded-systems/verbspec";
 
@@ -81,7 +82,24 @@ assert.equal(aiIsms("Built it — shipped it — loved it — done.").find((f) =
 assert.equal(valeEnabled(), false, "vale provider is off unless AUDIT_VALE is set");
 assert.deepEqual(valeLint("anything"), [], "vale provider is a no-op when off / vale absent");
 
-console.log("✓ prose checks verified — { level, msg } + ai-isms + overclaims + proofread + readability + vale gate");
+// ── optional textlint provider (opt-in via AUDIT_TEXTLINT) ──────────────────────
+assert.equal(textlintEnabled(), false, "textlint provider is off unless AUDIT_TEXTLINT is set");
+assert.deepEqual(await textlintLint("anything"), [], "textlint provider is a no-op when off");
+
+// ── registry-aware drift check (issue #22, Direction 2) ─────────────────────────
+const minReg = { audit: { input: { shape: { catalog: {}, store: { options: ["fs", "cas", "socket"] } } } } };
+const minVocab = vocabFromRegistry(minReg);
+assert.equal(registryDrift("Clean headline copy.", "headline", minVocab).length, 0, "no flag refs → no drift findings");
+assert.equal(registryDrift("Run `string-audit audit` to check.", "body", minVocab).length, 0, "known bin+verb pair → no drift");
+assert.ok(registryDrift("Run `string-audit analyze` to scan.", "body", minVocab).some((f) => f.level === "error" && /analyze/.test(f.msg)), "unknown verb → error");
+assert.ok(registryDrift("Pass --store for the backend.", "body", minVocab).length === 0, "known --flag → no drift");
+assert.ok(registryDrift("Pass --backend for storage.", "body", minVocab).some((f) => f.level === "error" && /backend/.test(f.msg)), "unknown --flag → error");
+assert.ok(registryDrift("Use STORE=redis for the backend.", "body", minVocab).some((f) => f.level === "error" && /redis/.test(f.msg)), "invalid enum value → error");
+assert.ok(registryDrift("Use STORE=socket for the backend.", "body", minVocab).length === 0, "valid enum value → no drift");
+assert.equal(registryDrift("Run `string-audit audit` now.", "cta", minVocab).length, 0, "cta type is skipped (not tool-doc copy)");
+assert.equal(registryDrift(null, "body", null).length, 0, "no vocab → graceful no-op");
+
+console.log("✓ prose checks verified — { level, msg } + ai-isms + overclaims + proofread + readability + vale gate + registry-drift");
 
 // ── verbspec surfaces: audit + extract as VerbSpecs → CLI + MCP (verbs.mjs) ──────
 const toolset = toMcpToolset(registry);

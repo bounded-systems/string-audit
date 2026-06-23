@@ -42,7 +42,9 @@ jobs:
           echo "$OUT" | grep -q '"name":"audit"'    # tools/list projects the audit verb
           echo "$OUT" | grep -q '"name":"extract"'  # ...and the extract verb
           echo "$OUT" | grep -q 'coverage'          # tools/call runs extract → structured output
-      - name: Install optional CAS backends (JSR) for the socket store
+      - name: Registry drift spike smoke-test
+        run: node spikes/registry-drift.mjs
+      - name: Install optional CAS backends + textlint for the socket store step
         run: npm install --include=optional --no-audit --no-fund
       - name: Room — mount the socket store + audit through it
         run: |
