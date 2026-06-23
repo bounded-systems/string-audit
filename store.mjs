@@ -6,16 +6,20 @@
 //                • @bounded-systems/cas       — content addressing (sha256Hex / sha256BareHex);
 //                  blobs stored by digest, get() re-hashes and rejects a corrupt/absent blob
 //                • a ref layer                — cache key → output digest
-//                • @bounded-systems/anchored-chain — each result gets a real in-toto
-//                  derivation (digestManifest → derivationId, manifestToStatement →
-//                  statement), serialized with canonicalJson. (DSSE ed25519 signing is
-//                  a small follow-up: assembleEnvelope + ed25519Signer.)
+//                • @bounded-systems/anchored-chain — each result gets a DSSE-signed
+//                  in-toto derivation: digestManifest → derivationId, manifestToStatement
+//                  → statement, assembleEnvelope + an ed25519 Signer → a signed DSSE
+//                  envelope (canonicalJson-serialized). Signing key persisted in the room.
 //              Enable with STORE=cas.
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { connect } from "node:net";
+import { createPrivateKey, createPublicKey } from "node:crypto";
 import { sha256Hex, sha256BareHex } from "@bounded-systems/cas";
-import { digestManifest, manifestToStatement, canonicalJson } from "@bounded-systems/anchored-chain";
+import {
+  digestManifest, manifestToStatement, canonicalJson,
+  assembleEnvelope, generateEd25519Keypair, ed25519Keyid, ed25519Signer,
+} from "@bounded-systems/anchored-chain";
 
 // Where the store mounts when it's a socket "door" — inside a room (cf. guest-room).
 export const socketPath = () => process.env.SOCK || join(process.env.ROOM || ".room", "store.sock");
@@ -37,6 +41,16 @@ export class CasStore {
     mkdirSync(this.refsDir, { recursive: true });
     this.enc = new TextEncoder();
     this.dec = new TextDecoder();
+    // ed25519 signing identity — persisted in the room (gitignored); generated once.
+    const keyPath = join(dir, "signer.key");
+    let priv, pub;
+    if (existsSync(keyPath)) { priv = createPrivateKey(readFileSync(keyPath)); pub = createPublicKey(priv); }
+    else {
+      const kp = generateEd25519Keypair(); priv = kp.privateKey; pub = kp.publicKey;
+      writeFileSync(keyPath, priv.export({ type: "pkcs8", format: "pem" }));
+    }
+    this.keyid = ed25519Keyid(pub);
+    this.signer = ed25519Signer(priv, this.keyid);
   }
   // ── cas BlobStore port (content address via @bounded-systems/cas) ──
   putBlob(bytes) { const name = sha256BareHex(bytes); const p = join(this.blobsDir, name); if (!existsSync(p)) writeFileSync(p, bytes); return sha256Hex(bytes); }
@@ -60,7 +74,7 @@ export class CasStore {
   async put(key, value) {
     const outputDigest = this.putBlob(this.enc.encode(JSON.stringify(value))); // result bytes → cas
     writeFileSync(this.#ref(key), outputDigest);                               // key → result
-    // real anchored-chain provenance: an in-toto derivation (input copy → output audit)
+    // real anchored-chain provenance: a DSSE-signed in-toto derivation (copy → audit)
     const manifest = {
       producer: "string-audit",
       inputs: { copy: sha256Hex(this.enc.encode(key)) },
@@ -70,7 +84,10 @@ export class CasStore {
     };
     const derivationId = digestManifest(manifest);
     const statement = manifestToStatement(manifest);
-    this.#append(canonicalJson({ derivationId, manifest, statement, ts: Date.now() }));
+    const { envelope, pae } = assembleEnvelope(statement);
+    const sig = await this.signer.sign(pae);                          // ed25519 sign the DSSE PAE
+    const signed = { ...envelope, signatures: [sig] };                // attach the signature
+    this.#append(canonicalJson({ derivationId, keyid: this.keyid, envelope: signed, ts: Date.now() }));
   }
 }
 
