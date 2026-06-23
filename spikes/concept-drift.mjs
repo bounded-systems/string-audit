@@ -21,6 +21,14 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadCatalog } from "../catalog.mjs";
 
+// Optional stem-aware matching (retext's Porter `stemmer`): "capabilities" ≈ "capability",
+// "agents" ≈ "agent", "secured" ≈ "security"... Falls back to exact lexical match if
+// `stemmer` isn't installed, so the spike stays runnable zero-dep. Enable: `npm i stemmer`
+// (it's an optionalDependency). The next iteration past this is embeddings — synonym/
+// semantic matches ("boundary" ≈ "scope") — which needs an embedding provider.
+let stem = (w) => w, stemMode = "lexical (exact)";
+try { ({ stemmer: stem } = await import("stemmer")); stemMode = "stem-aware (porter)"; } catch { /* fallback */ }
+
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
 const CANON = join(root, "vendor/brand/content/strings.json"); // the registry core = the message
@@ -42,20 +50,24 @@ const htmlText = (path) => readFileSync(path, "utf8")
 const target = process.argv[2] || join(root, "samples/page.html");
 const targetText = /\.html?$/.test(target) ? htmlText(target) : catalogText(target);
 
-// canonical concepts = content terms the brand core uses ≥1×, ranked by frequency
+// canonical concepts = content terms the brand core uses ≥1×. Matching is by STEM (when
+// available) so morphological variants count: "agents" covers "agent", etc.
 const canon = terms(catalogText(CANON));
 const tgt = terms(targetText);
+const tgtStems = new Set([...tgt.keys()].map(stem));
+const canonStems = new Set([...canon.keys()].map(stem));
+const hasConcept = (w) => tgtStems.has(stem(w));
 const concepts = [...canon.keys()];
-const covered = concepts.filter((c) => tgt.has(c));
-const missing = concepts.filter((c) => !tgt.has(c));
+const covered = concepts.filter(hasConcept);
+const missing = concepts.filter((c) => !hasConcept(c));
 const coverage = concepts.length ? Math.round((covered.length / concepts.length) * 100) : 100;
-// novel = the target's most-used terms the canon never says (possible off-message drift)
-const novel = [...tgt.entries()].filter(([w]) => !canon.has(w)).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([w]) => w);
+// novel = the target's most-used terms whose stem the canon never uses (off-message drift)
+const novel = [...tgt.entries()].filter(([w]) => !canonStems.has(stem(w))).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([w]) => w);
 
 console.log(`\n  CONCEPT DRIFT — ${target.replace(root + "/", "")} vs the brand canon\n  ${"─".repeat(52)}`);
-console.log(`  ${coverage}% of canon concepts present · ${covered.length}/${concepts.length} covered · ${novel.length} novel terms`);
+console.log(`  ${coverage}% of canon concepts present · ${covered.length}/${concepts.length} covered · ${novel.length} novel terms · ${stemMode}`);
 console.log(`\n  CANON CONCEPTS (the message)`);
-console.log(`     ${concepts.map((c) => (tgt.has(c) ? c : `\x1b[2m${c}\x1b[0m`)).join(" · ")}`);
+console.log(`     ${concepts.map((c) => (hasConcept(c) ? c : `\x1b[2m${c}\x1b[0m`)).join(" · ")}`);
 if (missing.length) {
   console.log(`\n  MISSING — canon concepts this surface dropped (drift?)`);
   console.log(`     ${missing.join(" · ")}`);
