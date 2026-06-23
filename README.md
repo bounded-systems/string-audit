@@ -109,11 +109,13 @@ Same `get/put/has` port, three backings:
   home for the socket "door"; the CAS blobs/refs/lineage live under `<room>/cas`.
 
 ## Status
-v0.3.1 — runnable. Deterministic + caching + grounding verified; the Anthropic path is
-implemented (live-verify with a key). Copy-hygiene suite (ai-isms, overclaims, proofread,
-readability) with data-driven [`ai-tells.json`](ai-tells.json) rules + first-class
-severity. The optional Vale provider now ships, gated on `AUDIT_VALE` (#6, #12); em-dash
-voice tells (antithesis, cadence) are `suggestion`, not `warn`, so intentional voice
-doesn't gate downstream. `cas`/`anchored-chain` are optional deps (the `STORE=cas`/socket
-backings); the default run needs neither. See open issues for productionization (real
-`strings.json` catalog).
+v0.4.0 — runnable. Deterministic + caching + grounding verified; the Anthropic path is
+implemented (live-verify with a key). `audit`/`extract` are authored once as
+[`verbspec`](https://github.com/bounded-systems/verbspec) `VerbSpec`s and projected to CLI
++ MCP (the `string-audit-mcp` bin); the `report` tool is the same projection (#18, #19).
+Copy-hygiene suite (ai-isms, overclaims, proofread, readability) with data-driven
+[`ai-tells.json`](ai-tells.json) rules + first-class severity. The optional Vale provider
+ships, gated on `AUDIT_VALE` (#6, #12); em-dash voice tells (antithesis, cadence) are
+`suggestion`, not `warn`, so intentional voice doesn't gate downstream.
+`cas`/`anchored-chain` are optional deps (the `STORE=cas`/socket backings); the default
+run needs neither. See open issues for productionization (real `strings.json` catalog).
