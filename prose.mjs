@@ -177,37 +177,42 @@ export function findOverlaps(catalog) {
 //   retext: 35-dep chain, AST, autofix — overkill for flag/token matching.
 //   In-house: zero deps, the registry is already the typed source of truth.
 //
-// prose.mjs must not import verbs.mjs (circular). Callers pass a `vocab` built by
-// vocabFromRegistry() before calling into the prose pipeline.
+// prose.mjs must not import verbspec/verbs.mjs (circular + keeps the consumer's prose-only
+// gate JSR-free). Callers project the registry and pass a `vocab` built by vocabFromToolset().
 
 const FLAG_RE = /(?<![\w-])--([a-z][a-z0-9-]*)/gi;
 const enumRef = (name) => new RegExp(`\\b(?:--${name}[ =]|${name.toUpperCase()}=)([a-z][a-z0-9-]*)`, "gi");
 const BACKTICK_RE = /`([^`]+)`/g;
 const BIN_VERB_RE = /^([\w][\w-]*)\s+([\w][\w-]*)$/;
 
-// Adapter: build the vocab from a verbspec registry (verbs.mjs format).
-// Call this once per audit run and pass the result to registryDrift().
-export function vocabFromRegistry(reg) {
-  if (!reg) return null;
-  const verbIds = new Set(Object.keys(reg));
+// Adapter: build the vocab from verbspec's PUBLIC projection — `toMcpToolset(registry)`,
+// i.e. [{ name, inputSchema }] where inputSchema is JSON Schema. `name` → verb id;
+// inputSchema.properties keys → flags; properties[x].enum → enum values. This deliberately
+// avoids reaching into Zod internals (`verb.input._def.shape()` / `field._def.entries`): a
+// private surface a zod/verbspec bump could change, silently degrading the vocab — and
+// since an unknown `--flag` is an error, a degraded vocab false-positives valid copy and
+// breaks the gate. The MCP projection is the stable contract test.mjs already pins.
+// prose.mjs stays verbspec-free; verbs.mjs (which has verbspec) projects and passes this.
+// Build once per audit run and hand the result to registryDrift().
+export function vocabFromToolset(toolset, bins = ["string-audit", "string-audit-mcp"]) {
+  if (!Array.isArray(toolset)) return null;
+  const verbIds = new Set();
   const flags = new Set(["help", "version"]);
   const enums = {};
-  const bins = new Set(["string-audit", "string-audit-mcp"]);
-  for (const verb of Object.values(reg)) {
-    try {
-      const shape = verb.input?.shape ?? verb.input?._def?.shape?.() ?? {};
-      for (const [name, field] of Object.entries(shape)) {
-        flags.add(name);
-        const opts = field?.options ?? field?._def?.entries ?? field?._def?.values;
-        if (opts) enums[name] = new Set(Array.isArray(opts) ? opts : Object.values(opts));
-      }
-    } catch { /* verbspec version differences */ }
+  for (const t of toolset) {
+    if (t?.name) verbIds.add(t.name);
+    for (const [name, prop] of Object.entries(t?.inputSchema?.properties ?? {})) {
+      flags.add(name.toLowerCase());
+      if (Array.isArray(prop?.enum)) enums[name.toLowerCase()] = new Set(prop.enum.map((x) => String(x).toLowerCase()));
+    }
   }
-  return { verbIds, flags, enums, bins };
+  return { verbIds, flags, enums, bins: new Set(bins) };
 }
 
 export function registryDrift(value, type, vocab) {
-  if (!vocab || !["body", "headline", "subhead", "title"].includes(type)) return [];
+  // Fail-safe: a missing/degraded vocab (only the globals → projection failed) must NOT
+  // turn valid --flags into false-positive errors. No-op instead of flagging.
+  if (!vocab || vocab.flags.size <= 2 || !["body", "headline", "subhead", "title"].includes(type)) return [];
   const { verbIds, flags, enums, bins } = vocab;
   const out = [];
   const seen = new Set();

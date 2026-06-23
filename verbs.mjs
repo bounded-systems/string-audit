@@ -8,9 +8,9 @@ import { createHash } from "node:crypto";
 import { dirname, join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { defineVerb } from "@bounded-systems/verbspec";
+import { defineVerb, toMcpTool } from "@bounded-systems/verbspec";
 import { auditWithAnthropic } from "./anthropic.mjs";
-import { spellCheck, grammarCheck, aiIsms, overclaims, proofread, readability, findOverlaps, registryDrift, vocabFromRegistry } from "./prose.mjs";
+import { spellCheck, grammarCheck, aiIsms, overclaims, proofread, readability, findOverlaps, registryDrift, vocabFromToolset } from "./prose.mjs";
 import { valeLint } from "./vale.mjs";
 import { textlintLint } from "./textlint.mjs";
 import { loadCatalog } from "./catalog.mjs";
@@ -126,8 +126,9 @@ export const auditVerb = defineVerb({
     writeFileSync(lastFile, JSON.stringify(Object.fromEntries(Object.entries(results).map(([s, r]) => [s, r.score]))));
 
     const typeLevel = (m) => /UNGROUNDED|grounded/i.test(m) ? "error" : "suggestion";
-    // Build the registry vocab once (not per-symbol) so registryDrift stays pure/no-import.
-    const vocab = vocabFromRegistry(registry);
+    // Build the registry vocab once (not per-symbol) from verbspec's public MCP projection,
+    // so registryDrift stays pure/verbspec-free and a zod bump can't silently degrade it.
+    const vocab = vocabFromToolset(Object.values(registry).map((vb) => toMcpTool(vb)));
     // textlintLint is async (dynamic import); all others are sync. Run async prose in parallel,
     // sync prose inline. The map returns Promises, which we settle via Promise.all.
     const symbols = await Promise.all(Object.entries(results).map(async ([s, r]) => {
