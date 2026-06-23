@@ -28,6 +28,22 @@ ANTHROPIC_API_KEY=… node audit.mjs   # real audits — only on cache-misses
   model (`claude-haiku-4-5`, override with `AUDIT_MODEL`), grounding enforced in the
   system prompt.
 
+## Copy hygiene — deterministic prose checks
+Run on every symbol, every run (cheap, never cached):
+- **spell** — modern wordlist ∪ `dictionary.txt` (brand terms).
+- **grammar/style** — write-good (passive, wordiness, weasel words).
+- **ai-isms** — the formulaic tells of machine-written copy: `it isn't X — it's Y`
+  antithesis, `the easy part … the hard part`, rule-of-three triads, em-dash cadence,
+  rhetorical teaser fragments, and buzzword filler (`delve`, `seamless`, `leverage`,
+  `unlock`, `robust` …). Each finding names the tell so a human can rewrite it.
+- **overclaims** — absolute, unprovable language (`every`, `always`, `guaranteed`,
+  `100%`); scope the claim or link a source. The prose analogue of the grounding check.
+- **overlap** — symbols whose copy is duplicated or near-duplicate.
+
+The ai-ism and overclaim rules come from a cold read of the public copy ("AI-isms make
+me want to die"; "never claim *every* privileged effect"). The keyed Anthropic auditor is
+told the same rules, so the LLM path flags them too.
+
 ## Reuses the bounded-systems stack
 | Need | Primitive |
 |---|---|

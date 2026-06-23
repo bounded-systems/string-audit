@@ -11,7 +11,7 @@ import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { auditWithAnthropic } from "./anthropic.mjs";
-import { spellCheck, grammarCheck, findOverlaps } from "./prose.mjs";
+import { spellCheck, grammarCheck, aiIsms, overclaims, findOverlaps } from "./prose.mjs";
 import { loadCatalog } from "./catalog.mjs";
 import { makeStore } from "./store.mjs";
 
@@ -90,7 +90,8 @@ for (const [s, r] of Object.entries(results)) {
   const prev = last[s];
   const d = prev == null ? "" : r.score > prev ? ` ▲+${r.score - prev}` : r.score < prev ? ` ▼${r.score - prev}` : "";
   console.log(`  ${r.cached ? "·" : "✦"} ${s.padEnd(20)} [${r.type.padEnd(8)}] ${r.score}/10${d}`);
-  const prose = [...spellCheck(catalog[s].value), ...grammarCheck(catalog[s].value)]; // fresh, not cached
+  const v = catalog[s].value;
+  const prose = [...spellCheck(v), ...grammarCheck(v), ...aiIsms(v), ...overclaims(v)]; // fresh, not cached
   for (const finding of [...r.findings, ...prose]) console.log(`       ✗ ${finding}`);
 }
 
@@ -102,5 +103,5 @@ if (overlaps.length) {
 }
 
 console.log(`\n  cache: ${hits} hit (free) · ${misses} miss (= API calls this run)`);
-console.log(`  prose: spell (modern wordlist + dictionary.txt) + grammar (write-good)`);
+console.log(`  prose: spell + grammar (write-good) + ai-isms + overclaims (uncached)`);
 console.log(`  ✦ computed   · served from CAS\n`);
