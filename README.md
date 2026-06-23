@@ -44,10 +44,15 @@ human CLI view, and MCP / agents consume `output` directly:
   every string on a surface to a DTCG token (covered ones reuse their catalog symbol,
   uncovered get a proposed `surface.*` key) — **bootstrap a catalog from a page**, then
   refine. Round-trips: the emitted file is a valid `CATALOG=` input.
+- **Scan** — `node scan.mjs [dir] [--emit]` (the `string-audit-scan` bin) extracts **every
+  hardcoded static string from source** (i18n-style, AST via optional `acorn`), splits
+  *keepers* (copy that should be a typed symbol) from incidental, and **Zod-validates** each
+  keeper against its type's contract ([`types.mjs`](types.mjs) — the same contracts `audit`
+  uses). All static strings surfaced; Zod + symbols for the ones that matter.
 - **MCP** — `node mcp.mjs` (the `string-audit-mcp` bin) is a stdio MCP server exposing
-  `audit` + `extract` as tools: `tools/list` is the projected toolset, `tools/call`
-  validates arguments against the verb's Zod input and runs it. So an agent can audit copy
-  or extract a surface as a tool call.
+  `audit` + `extract` + `scan` as tools: `tools/list` is the projected toolset, `tools/call`
+  validates arguments against the verb's Zod input and runs it. So an agent can audit copy,
+  extract a surface, or scan a tree as a tool call.
 - **Anthropic** — the `report` tool (above) is the same projection (`toAnthropicTool`).
 
 ## Copy hygiene — deterministic prose checks
