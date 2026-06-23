@@ -40,42 +40,42 @@ console.log("✓ anthropic path verified — request shape + response parsing (n
 const hits = (findings, re) => findings.some((f) => re.test(f.msg));
 
 // ── prose: the { level, msg } contract ──────────────────────────────────────────
-const sample = aiIsms("It isn't a frame — it's a window.");
+const sample = aiIsms("It isn't a process — it's a door.");
 assert.ok(sample.every((f) => f.msg && ["error", "warn", "suggestion"].includes(f.level)), "findings carry { level, msg }");
 assert.ok(hits(aiIsms("As an AI language model, I can't help."), /chatbot|refusal/) , "data-driven error rule fires");
 assert.ok(aiIsms("As an AI language model, I can't help.").some((f) => f.level === "error"), "chatbot artifact is error-level");
 
 // ── prose: AI-isms (cold-read rule 4) ──────────────────────────────────────────
 assert.ok(hits(sample, /antithesis/), "catches \"it isn't X — it's Y\"");
-assert.ok(hits(aiIsms("Setup is the easy part."), /easy.*part/i), "catches \"the easy part\" framing");
+assert.ok(hits(aiIsms("Authoring is the easy part."), /easy.*part/i), "catches \"the easy part\" framing");
 assert.ok(hits(aiIsms("Fast, simple, and reliable."), /rule-of-three/), "catches rule-of-three triad");
 assert.ok(hits(aiIsms("We leverage a robust, seamless platform."), /filler/), "catches buzzword filler");
 assert.ok(hits(aiIsms("Built it — shipped it — loved it — done."), /em-dash/), "catches em-dash cadence (3+)");
 assert.ok(hits(aiIsms("It reaches past it — touching files, running a command, doing something else."), /tricolon/), "catches gerund tricolon");
-assert.equal(aiIsms("The frame that fills itself with photos").length, 0, "clean copy → no ai-isms");
+assert.equal(aiIsms("The boundary an agent acts through").length, 0, "clean copy → no ai-isms");
 assert.equal(aiIsms("A capability model — the core idea — applied here.").filter((f) => /em-dash/.test(f.msg)).length, 0, "a single parenthetical em-dash pair is fine");
 
 // ── prose: overclaims (cold-read rule 5 / Lane C honesty) ───────────────────────
 assert.ok(hits(overclaims("Secures every privileged effect."), /every/), "flags the \"every privileged effect\" coverage overclaim");
 assert.ok(overclaims("Guaranteed to work.").length >= 1, "flags 'guaranteed'");
-assert.equal(overclaims("No subscription required.").length, 0, "scoped copy → no overclaim");
+assert.equal(overclaims("No ambient authority required.").length, 0, "scoped copy → no overclaim");
 assert.equal(overclaims("doing something you never asked for").length, 0, "ordinary 'never' (no coverage term) is not an overclaim");
 assert.equal(overclaims("never the credential behind it").length, 0, "ordinary 'never' (no coverage term) is not an overclaim");
 
 // ── prose: proofread ("was this proof read?") ───────────────────────────────────
-assert.ok(hits(proofread("the the frame"), /doubled word/), "catches doubled word");
-assert.ok(hits(proofread("photos by text,email or web"), /after comma/), "catches missing space after comma");
-assert.ok(hits(proofread("Great frame !"), /space before/), "catches space before punctuation");
+assert.ok(hits(proofread("the the door"), /doubled word/), "catches doubled word");
+assert.ok(hits(proofread("drawn at the door,not the process"), /after comma/), "catches missing space after comma");
+assert.ok(hits(proofread("Bounded authority !"), /space before/), "catches space before punctuation");
 assert.ok(hits(proofread("It’s a \"gem\""), /mixed/), "catches mixed straight + curly quotes");
 assert.equal(proofread("A clean, well-written line.").length, 0, "clean copy → no proofread flags");
 assert.equal(spellCheck("It isn't broken and we're fine").length, 0, "contractions aren't misspellings");
 
 // ── prose: readability ("why am I reading this?") ───────────────────────────────
 assert.ok(hits(readability(("word ".repeat(30)).trim(), "body"), /long sentence/), "catches over-long sentence");
-assert.equal(readability("Shows photos sent by text.", "body").length, 0, "short, plain copy → no readability flag");
+assert.equal(readability("Authority drawn at the door.", "body").length, 0, "short, plain copy → no readability flag");
 
 // ── voice-safe levels (downstream note: intentional em-dash voice must not gate) ─
-assert.equal(aiIsms("It isn't a frame — it's a window.").find((f) => /antithesis/.test(f.msg)).level, "suggestion", "em-dash antithesis is suggestion, not warn");
+assert.equal(aiIsms("It isn't a process — it's a door.").find((f) => /antithesis/.test(f.msg)).level, "suggestion", "em-dash antithesis is suggestion, not warn");
 assert.equal(aiIsms("Built it — shipped it — loved it — done.").find((f) => /em-dash/.test(f.msg)).level, "suggestion", "em-dash cadence is suggestion, not warn");
 
 // ── optional Vale provider (opt-in via AUDIT_VALE) ──────────────────────────────
@@ -108,9 +108,9 @@ assert.ok(toMcpTool(extractVerb).inputSchema.required.includes("file"), "extract
 assert.ok(!toMcpTool(auditVerb).inputSchema.required, "audit MCP tool has no required args (all env-defaulted flags)");
 
 // CLI projection: parseArgs maps the file positional + flags, validated by the Zod input.
-const exInput = parseArgs(extractVerb, ["samples/page.html", "--catalog", "catalog.json"]);
+const exInput = parseArgs(extractVerb, ["samples/page.html", "--catalog", "vendor/brand/content/strings.json"]);
 assert.equal(exInput.file, "samples/page.html", "file positional parsed");
-assert.equal(exInput.catalog, "catalog.json", "--catalog flag parsed");
+assert.equal(exInput.catalog, "vendor/brand/content/strings.json", "--catalog flag parsed");
 
 // extract.run is a pure read → structured `output` (the shape MCP/agents consume); the CLI
 // view is just render(output).

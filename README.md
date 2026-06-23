@@ -11,8 +11,8 @@ ANTHROPIC_API_KEY=… node audit.mjs   # real audits — only on cache-misses
 ```
 
 ## One boundary, four properties
-1. **Symbols, not blobs** — `pdp.hero.headline → { type: "headline", value }`. The
-   **type is the contract**; it decides which audits apply.
+1. **Symbols, not blobs** — `tagline → { type: "tagline", value: "Bounded authority for AI agents" }`.
+   The **type is the contract**; it decides which audits apply.
 2. **Type-scoped audits** — `headline` → length/punch; `cta` → action-verb; `meta` →
    ≤160; `claim` → **grounding** (the "every claim proven" check).
 3. **Content-addressed cache** — `key = sha256(auditVersion : type : value)`. Unchanged
@@ -118,4 +118,7 @@ Copy-hygiene suite (ai-isms, overclaims, proofread, readability) with data-drive
 ships, gated on `AUDIT_VALE` (#6, #12); em-dash voice tells (antithesis, cadence) are
 `suggestion`, not `warn`, so intentional voice doesn't gate downstream.
 `cas`/`anchored-chain` are optional deps (the `STORE=cas`/socket backings); the default
-run needs neither. See open issues for productionization (real `strings.json` catalog).
+run needs neither. The default catalog is the **real semantic-key registry** —
+[`brand`](https://github.com/bounded-systems/brand)'s canonical content tokens, vendored
+at `vendor/brand` (DTCG `content/strings.json`). Point `CATALOG=` at a surface's own
+merged `content/strings.json` to audit its copy; the photo-frame demo catalog is gone.

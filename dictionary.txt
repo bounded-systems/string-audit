@@ -15,20 +15,14 @@ slsa
 in-toto
 capability
 
-# product (digital photo frame)
-frame
-frames
-wifi
-slideshow
-uploader
-pdp
-
-# wearable/health domain (for the cross-brand audit examples)
-spo2
-hrv
-bpm
-wearable
-biometric
+# domain — capability security for AI agents (bounded.tools)
+capabilities
+ocaps
+verbspec
+mcp
+openapi
+runtime
+daemon
 
 # common modern words the dated base wordlist (web2) lacks
 email
