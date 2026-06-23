@@ -8,13 +8,13 @@
 import { createServer } from "node:net";
 import { mkdirSync, rmSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { CasStore, socketPath } from "./store.mjs";
+import { makeCasStore, socketPath } from "./store.mjs";
 
 const sock = socketPath();
 const room = dirname(sock);
 mkdirSync(room, { recursive: true });
 if (existsSync(sock)) rmSync(sock); // clear a stale socket
-const store = new CasStore(join(room, "cas"));
+const store = await makeCasStore(join(room, "cas")); // loads cas/anchored-chain backends
 
 const server = createServer((c) => {
   let buf = "";

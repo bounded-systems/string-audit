@@ -15,17 +15,24 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } fr
 import { join } from "node:path";
 import { connect } from "node:net";
 import { createPrivateKey, createPublicKey } from "node:crypto";
-// CasStore backends are loaded ONLY when STORE=cas, so the default FsStore path
-// (the documented "offline, free" run) needs no @bounded-systems packages installed.
-const { sha256Hex, sha256BareHex } = process.env.STORE === "cas"
-  ? await import("@bounded-systems/cas")
-  : {};
-const {
-  digestManifest, manifestToStatement, canonicalJson,
-  assembleEnvelope, generateEd25519Keypair, ed25519Keyid, ed25519Signer,
-} = process.env.STORE === "cas"
-  ? await import("@bounded-systems/anchored-chain")
-  : {};
+// CasStore backends (cas + anchored-chain) load lazily — only when a CasStore is
+// actually built, never on the default FsStore / SocketStore-client paths. So the
+// documented "offline, free" run needs no @bounded-systems packages installed. The
+// load keys off CasStore *construction* (via makeCasStore), not the STORE env: the
+// store daemon builds a CasStore with no STORE set, and must load them too.
+let sha256Hex, sha256BareHex;
+let digestManifest, manifestToStatement, canonicalJson,
+  assembleEnvelope, generateEd25519Keypair, ed25519Keyid, ed25519Signer;
+let casBackendsLoaded = false;
+async function loadCasBackends() {
+  if (casBackendsLoaded) return;
+  ({ sha256Hex, sha256BareHex } = await import("@bounded-systems/cas"));
+  ({
+    digestManifest, manifestToStatement, canonicalJson,
+    assembleEnvelope, generateEd25519Keypair, ed25519Keyid, ed25519Signer,
+  } = await import("@bounded-systems/anchored-chain"));
+  casBackendsLoaded = true;
+}
 
 // Where the store mounts when it's a socket "door" — inside a room (cf. guest-room).
 export const socketPath = () => process.env.SOCK || join(process.env.ROOM || ".room", "store.sock");
@@ -115,8 +122,16 @@ export class SocketStore {
   async put(key, value) { await this.#rpc({ op: "put", key, value }); }
 }
 
+// Build a CasStore, loading its cas/anchored-chain backends first. The one sanctioned
+// way to construct one — both makeStore (STORE=cas) and the store daemon go through here,
+// so the lazy backends are always loaded before the constructor reaches for them.
+export async function makeCasStore(dir) {
+  await loadCasBackends();
+  return new CasStore(dir);
+}
+
 export async function makeStore(fsDir) {
   if (process.env.STORE === "socket") return new SocketStore(socketPath()); // mounted door, in a room
-  if (process.env.STORE === "cas") return new CasStore(join(fsDir, "cas"));
+  if (process.env.STORE === "cas") return makeCasStore(join(fsDir, "cas"));
   return new FsStore(fsDir);
 }
