@@ -15,11 +15,17 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } fr
 import { join } from "node:path";
 import { connect } from "node:net";
 import { createPrivateKey, createPublicKey } from "node:crypto";
-import { sha256Hex, sha256BareHex } from "@bounded-systems/cas";
-import {
+// CasStore backends are loaded ONLY when STORE=cas, so the default FsStore path
+// (the documented "offline, free" run) needs no @bounded-systems packages installed.
+const { sha256Hex, sha256BareHex } = process.env.STORE === "cas"
+  ? await import("@bounded-systems/cas")
+  : {};
+const {
   digestManifest, manifestToStatement, canonicalJson,
   assembleEnvelope, generateEd25519Keypair, ed25519Keyid, ed25519Signer,
-} from "@bounded-systems/anchored-chain";
+} = process.env.STORE === "cas"
+  ? await import("@bounded-systems/anchored-chain")
+  : {};
 
 // Where the store mounts when it's a socket "door" — inside a room (cf. guest-room).
 export const socketPath = () => process.env.SOCK || join(process.env.ROOM || ".room", "store.sock");
