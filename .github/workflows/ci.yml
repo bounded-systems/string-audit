@@ -1,6 +1,10 @@
 name: ci
 
-# Content-audit pipeline: install → audit (deterministic) → cache invariant → extract+coverage.
+# Content-audit pipeline: install (prose only) → audit (deterministic) → cache invariant
+# → extract+coverage → optionally install the CAS backends and exercise the socket store.
+# The core path stays JSR-free (npm ci --omit=optional); cas/anchored-chain are optional
+# deps installed on demand only for the socket-store step, so npm.jsr.io flakiness can't
+# break the default pipeline.
 on:
   push:
     branches: [main]
@@ -17,8 +21,8 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
-      - name: Install (wordlist + write-good)
-        run: npm ci
+      - name: Install — prose deps only, no JSR/CAS backends (wordlist + write-good)
+        run: npm ci --omit=optional
       - name: Test — anthropic path (request shape + parsing)
         run: node test.mjs
       - name: Audit (deterministic — spell + grammar + grounding)
@@ -27,6 +31,8 @@ jobs:
         run: node audit.mjs | grep -q "0 miss"
       - name: Extract + coverage
         run: node extract.mjs samples/page.html
+      - name: Install optional CAS backends (JSR) for the socket store
+        run: npm install --include=optional --no-audit --no-fund
       - name: Room — mount the socket store + audit through it
         run: |
           node store-daemon.mjs &
