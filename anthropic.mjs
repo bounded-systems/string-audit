@@ -28,6 +28,8 @@ Flag AI-isms — the formulaic tells of machine-written copy: "it isn't X — it
 antithesis, "the easy part … the hard part", rule-of-three triads, buzzword filler
 (delve, seamless, leverage, unlock, robust, elevate), and rhetorical teaser fragments.
 Flag absolute overclaims ("every", "always", "guaranteed", "100%") unless GROUNDING backs them.
+Flag proofreading defects (typos, doubled words, stray/missing spaces, mixed quote styles)
+and copy that's hard to read (over-long or dense sentences a reader would bounce off).
 Call the report tool with a score and concrete findings.`;
 
 // Pure: build the Messages API request body (testable without a network call).

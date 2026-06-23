@@ -2,7 +2,7 @@
 // shape + response parsing (the live call itself is a keyed run, not tested here).
 import assert from "node:assert/strict";
 import { buildRequest, parseResponse } from "./anthropic.mjs";
-import { aiIsms, overclaims } from "./prose.mjs";
+import { aiIsms, overclaims, spellCheck, proofread, readability } from "./prose.mjs";
 
 // request shape
 const req = buildRequest({ type: "headline", value: "Hello world", grounding: ["fact-a", "fact-b"] });
@@ -37,4 +37,17 @@ assert.equal(overclaims("No subscription required.").length, 0, "scoped copy →
 assert.equal(overclaims("doing something you never asked for").length, 0, "ordinary 'never' (no coverage term) is not an overclaim");
 assert.equal(overclaims("never the credential behind it").length, 0, "ordinary 'never' (no coverage term) is not an overclaim");
 
-console.log("✓ prose checks verified — ai-isms + overclaims");
+// ── prose: proofread ("was this proof read?") ───────────────────────────────────
+assert.ok(proofread("the the frame").some((f) => /doubled word/.test(f)), "catches doubled word");
+assert.ok(proofread("photos by text,email or web").some((f) => /after comma/.test(f)), "catches missing space after comma");
+assert.ok(proofread("Great frame !").some((f) => /space before/.test(f)), "catches space before punctuation");
+assert.ok(proofread("It’s a \"gem\"").some((f) => /mixed/.test(f)), "catches mixed straight + curly quotes");
+assert.equal(proofread("A clean, well-written line.").length, 0, "clean copy → no proofread flags");
+// contractions are no longer flagged as misspellings
+assert.equal(spellCheck("It isn't broken and we're fine").length, 0, "contractions aren't misspellings");
+
+// ── prose: readability ("why am I reading this?") ───────────────────────────────
+assert.ok(readability(("word ".repeat(30)).trim(), "body").some((f) => /long sentence/.test(f)), "catches over-long sentence");
+assert.equal(readability("Shows photos sent by text.", "body").length, 0, "short, plain copy → no readability flag");
+
+console.log("✓ prose checks verified — ai-isms + overclaims + proofread + readability");
