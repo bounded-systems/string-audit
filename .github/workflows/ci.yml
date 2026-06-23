@@ -50,18 +50,19 @@ jobs:
           echo "$OUT"
           echo "$OUT" | grep -q '"name":"audit"'    # tools/list projects the audit verb
           echo "$OUT" | grep -q '"name":"extract"'  # ...and extract
-          echo "$OUT" | grep -q '"name":"scan"'     # ...and scan
+          echo "$OUT" | grep -q '"name":"scan"'             # ...and scan
+          echo "$OUT" | grep -q '"name":"concept-drift"'    # ...and concept-drift
           echo "$OUT" | grep -q 'coverage'          # tools/call runs extract → structured output
       - name: Registry drift spike smoke-test
         run: node spikes/registry-drift.mjs
-      - name: Concept drift spike smoke-test
-        run: node spikes/concept-drift.mjs
+      - name: Concept-drift verb smoke-test (core — exact-overlap fallback, zero-dep)
+        run: node concept-drift.mjs
       - name: Install optional CAS backends + textlint for the socket store step
         run: npm install --include=optional --no-audit --no-fund
       - name: Typecheck — tsc --checkJs (no build; full deps so optional import()s resolve)
         run: npm run typecheck
-      - name: Concept drift spike — stemmed matching (optional stemmer now installed)
-        run: node spikes/concept-drift.mjs samples/page.html | grep -q "token overlap (stemmed)"
+      - name: Concept-drift verb — stemmed matching (optional stemmer now installed)
+        run: node concept-drift.mjs samples/page.html | grep -q "token overlap (stemmed)"
       - name: Scan verb — AST extract + Zod-typed keepers, emit round-trips
         run: |
           node scan.mjs | grep -q "acorn AST"                         # optional acorn now installed

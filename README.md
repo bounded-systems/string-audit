@@ -49,10 +49,15 @@ human CLI view, and MCP / agents consume `output` directly:
   *keepers* (copy that should be a typed symbol) from incidental, and **Zod-validates** each
   keeper against its type's contract ([`types.mjs`](types.mjs) — the same contracts `audit`
   uses). All static strings surfaced; Zod + symbols for the ones that matter.
+- **Concept-drift** — `node concept-drift.mjs [target]` (the `string-audit-concept-drift`
+  bin) asks, for each canonical brand *message*, whether a surface string still *means* it —
+  string-level, like i18n/translation. **Tiered matching**, best-available + graceful
+  fallback: **embeddings** (semantic, opt-in `EMBED_API_KEY`, OpenAI-compatible) → **token
+  overlap, stemmed** (optional `stemmer`) → **exact** (zero-dep). A *signal*, not a gate.
 - **MCP** — `node mcp.mjs` (the `string-audit-mcp` bin) is a stdio MCP server exposing
-  `audit` + `extract` + `scan` as tools: `tools/list` is the projected toolset, `tools/call`
-  validates arguments against the verb's Zod input and runs it. So an agent can audit copy,
-  extract a surface, or scan a tree as a tool call.
+  `audit` + `extract` + `scan` + `concept-drift` as tools: `tools/list` is the projected
+  toolset, `tools/call` validates arguments against the verb's Zod input and runs it. So an
+  agent can audit copy, extract a surface, scan a tree, or check drift as a tool call.
 - **Anthropic** — the `report` tool (above) is the same projection (`toAnthropicTool`).
 
 ## Types — no build step

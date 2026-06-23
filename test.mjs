@@ -5,15 +5,15 @@ import { buildRequest, parseResponse } from "./anthropic.mjs";
 import { aiIsms, overclaims, spellCheck, proofread, readability, registryDrift, vocabFromToolset } from "./prose.mjs";
 import { valeLint, valeEnabled } from "./vale.mjs";
 import { textlintEnabled, textlintLint } from "./textlint.mjs";
-import { auditVerb, extractVerb, scanVerb, registry } from "./verbs.mjs";
+import { auditVerb, extractVerb, scanVerb, conceptDriftVerb, registry } from "./verbs.mjs";
 import { typeFindings, claimFindings } from "./types.mjs";
 import { toMcpToolset, toMcpTool, parseArgs } from "@bounded-systems/verbspec";
 
 // request shape
 const req = buildRequest({ type: "headline", value: "Hello world", grounding: ["fact-a", "fact-b"] });
 assert.equal(req.tool_choice.name, "report", "forces the report tool (structured output)");
-assert.ok(req.tools[0].input_schema.required.includes("score"), "schema requires score");
-assert.ok(req.tools[0].input_schema.required.includes("findings"), "schema requires findings");
+assert.ok(/** @type {any} */ (req.tools[0].input_schema).required.includes("score"), "schema requires score");
+assert.ok(/** @type {any} */ (req.tools[0].input_schema).required.includes("findings"), "schema requires findings");
 // The tool is single-sourced from a VerbSpec (anthropic.mjs, projected via toAnthropicTool);
 // pin the exact projected schema so a verbspec/zod bump can't silently drift the contract
 // (no $schema pointer; integer 0..10; string[]; additionalProperties:false).
@@ -113,8 +113,8 @@ console.log("✓ prose checks verified — { level, msg } + ai-isms + overclaims
 
 // ── verbspec surfaces: audit + extract as VerbSpecs → CLI + MCP (verbs.mjs) ──────
 const toolset = toMcpToolset(registry);
-assert.deepEqual(toolset.map((t) => t.name).sort(), ["audit", "extract", "scan"], "registry projects audit + extract + scan to the MCP toolset");
-assert.ok(toMcpTool(extractVerb).inputSchema.required.includes("file"), "extract MCP tool requires the file argument");
+assert.deepEqual(toolset.map((t) => t.name).sort(), ["audit", "concept-drift", "extract", "scan"], "registry projects audit + extract + scan + concept-drift to the MCP toolset");
+assert.ok(/** @type {any} */ (toMcpTool(extractVerb).inputSchema).required.includes("file"), "extract MCP tool requires the file argument");
 assert.ok(!toMcpTool(auditVerb).inputSchema.required, "audit MCP tool has no required args (all env-defaulted flags)");
 
 // CLI projection: parseArgs maps the file positional + flags, validated by the Zod input.
@@ -124,7 +124,7 @@ assert.equal(exInput.catalog, "vendor/brand/content/strings.json", "--catalog fl
 
 // extract.run is a pure read → structured `output` (the shape MCP/agents consume); the CLI
 // view is just render(output).
-const ex = extractVerb.run({ file: "samples/page.html" });
+const ex = await extractVerb.run({ file: "samples/page.html" }); // run may be sync or async per the VerbSpec type
 assert.equal(ex.file, "page.html");
 assert.ok(ex.coverage >= 0 && ex.coverage <= 100, "coverage is a percent");
 assert.ok(ex.uncovered.every((u) => u.symbol.startsWith("surface.")), "each uncovered string carries a proposed symbol");
@@ -149,4 +149,12 @@ assert.ok(typeFindings("cta", "Learn more about everything here").includes("does
 assert.equal(claimFindings("Rated 4.8 stars by 12,000 customers.", []).length, 1, "an ungrounded stat is flagged");
 assert.equal(claimFindings("Rated 4.8 stars.", ["4.8 stars"]).length, 0, "a grounded stat passes");
 
-console.log("✓ verbspec surfaces verified — audit/extract/scan VerbSpecs → CLI + MCP + structured output + shared Zod type contracts");
+// concept-drift: per-message coverage vs the brand canon (string-level, tiered matching)
+const cd = await conceptDriftVerb.run({ target: "samples/page.html" });
+assert.ok(cd.canon > 0 && cd.surface > 0, "concept-drift reads canon + surface strings");
+assert.ok(cd.coverage >= 0 && cd.coverage <= 100, "coverage is a percent of canon messages represented");
+assert.equal(cd.messages.length, cd.canon, "one entry per canon message");
+assert.ok(cd.messages.every((m) => typeof m.represented === "boolean" && typeof m.score === "number"), "each canon message reports a best match + represented flag");
+assert.ok(/token overlap|embeddings/.test(cd.mode), "reports the active match tier (graceful fallback)");
+
+console.log("✓ verbspec surfaces verified — audit/extract/scan/concept-drift VerbSpecs → CLI + MCP + structured output + shared Zod type contracts");

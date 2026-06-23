@@ -6,12 +6,14 @@
   "bin": {
     "string-audit": "audit.mjs",
     "string-audit-mcp": "mcp.mjs",
-    "string-audit-scan": "scan.mjs"
+    "string-audit-scan": "scan.mjs",
+    "string-audit-concept-drift": "concept-drift.mjs"
   },
   "scripts": {
     "audit": "node audit.mjs",
     "extract": "node extract.mjs",
     "scan": "node scan.mjs",
+    "concept-drift": "node concept-drift.mjs",
     "mcp": "node mcp.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node test.mjs"

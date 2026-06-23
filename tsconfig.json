@@ -12,6 +12,5 @@
     "noImplicitAny": false,
     "strict": false
   },
-  "include": ["*.mjs"],
-  "exclude": ["test.mjs"]
+  "include": ["*.mjs"]
 }

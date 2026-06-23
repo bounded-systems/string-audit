@@ -341,4 +341,102 @@ export const scanVerb = defineVerb({
 });
 
 // One typed registry → CLI bins + the MCP toolset (mcp.mjs). `report` is Anthropic-only.
-export const registry = { audit: auditVerb, extract: extractVerb, scan: scanVerb };
+// ── concept-drift ───────────────────────────────────────────────────────────────
+// The softer cousin of registry-drift (#28): has a surface drifted from the canonical
+// brand MESSAGES? Treat every string as a unit (i18n/translation-style) and ask, for each
+// canon message, whether a surface string means it. Tiered matching, best-available +
+// graceful fallback: embeddings (semantic, opt-in EMBED_API_KEY) → token overlap (stemmed,
+// optional `stemmer`) → token overlap (exact). A signal, not a gate.
+const CD_STOP = new Set("a an and are as at be but by for from has have in into is it its no not of on or our that the their them they this to was we with you your".split(" "));
+const jaccard = (a, b) => { const inter = [...a].filter((x) => b.has(x)).length; const uni = new Set([...a, ...b]).size; return uni ? inter / uni : 0; };
+const cosine = (a, b) => { let d = 0, na = 0, nb = 0; for (let k = 0; k < a.length; k++) { d += a[k] * b[k]; na += a[k] * a[k]; nb += b[k] * b[k]; } return d / (Math.sqrt(na) * Math.sqrt(nb) || 1); };
+const catalogStrings = (path) => Object.values(loadCatalog(path)).map((s) => s.value);
+const htmlStrings = (path) => {
+  const html = readFileSync(path, "utf8").replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ");
+  const out = [];
+  for (const m of html.matchAll(/<meta[^>]+content=["']([^"']+)["']/gi)) out.push(m[1]);          // meta copy
+  for (const m of html.matchAll(/\b(?:alt|aria-label|placeholder|title)=["']([^"']+)["']/gi)) out.push(m[1]); // attr copy
+  for (const s of html.replace(/<[^>]+>/g, "\n").replace(/&[a-z]+;|&#\d+;/gi, " ").split(/\n|(?<=[.!?])\s+/)) out.push(s); // visible text
+  return out;
+};
+const cleanStrings = (arr) => [...new Set(arr.map((s) => s.replace(/\s+/g, " ").trim()).filter((s) => /[a-z]/i.test(s) && s.length >= 3))];
+const argmax = (n, f) => { let bj = -1, bv = -Infinity; for (let j = 0; j < n; j++) { const s = f(j); if (s > bv) { bv = s; bj = j; } } return { j: bj, s: Math.max(0, bv) }; };
+
+export const conceptDriftVerb = defineVerb({
+  id: "concept-drift",
+  summary: "Has a surface drifted from the canonical brand messages? Per-message coverage vs the registry core.",
+  actor: "audit",
+  input: z.object({
+    target: z.string().optional().describe("Catalog (.json) or HTML surface to check (default: the sample surface)."),
+    canon: z.string().optional().describe("Canonical catalog to compare against (default: the vendored brand registry)."),
+  }),
+  positionals: ["target"],
+  output: z.object({
+    target: z.string(),
+    mode: z.string(),
+    coverage: z.number(),
+    canon: z.number(),
+    surface: z.number(),
+    messages: z.array(z.object({ value: z.string(), score: z.number(), represented: z.boolean(), match: z.string().nullable() })),
+    offMessage: z.array(z.string()),
+  }),
+  run: async (input) => {
+    let stem = (/** @type {string} */ w) => w, stemLabel = "exact";
+    try { ({ stemmer: stem } = await import("stemmer")); stemLabel = "stemmed"; } catch { /* optional */ }
+    const wordSet = (s) => new Set((String(s).toLowerCase().match(/[a-z][a-z'-]{2,}/g) ?? []).filter((w) => !CD_STOP.has(w)).map(stem));
+    const targetPath = input.target ?? join(here, "samples/page.html");
+    const canonStrings = cleanStrings(catalogStrings(input.canon ?? DEFAULT_CATALOG));
+    const targetStrings = cleanStrings(/\.html?$/.test(targetPath) ? htmlStrings(targetPath) : catalogStrings(targetPath));
+
+    let mode, sim, threshold;
+    const EMBED_KEY = process.env.EMBED_API_KEY;
+    if (EMBED_KEY) {
+      const url = process.env.EMBED_URL || "https://api.openai.com/v1/embeddings";
+      const model = process.env.EMBED_MODEL || "text-embedding-3-small";
+      threshold = Number(process.env.EMBED_THRESHOLD || 0.6); // sentence cosines run higher than token Jaccard
+      try {
+        const res = await fetch(url, { method: "POST", headers: { authorization: `Bearer ${EMBED_KEY}`, "content-type": "application/json" }, body: JSON.stringify({ model, input: [...canonStrings, ...targetStrings] }) });
+        if (!res.ok) throw new Error(`${res.status}: ${(await res.text()).slice(0, 120)}`);
+        const v = (/** @type {any} */ (await res.json())).data.map((/** @type {any} */ d) => d.embedding); // OpenAI-compatible response shape
+        const cv = canonStrings.map((_, i) => v[i]);
+        const tv = targetStrings.map((_, i) => v[canonStrings.length + i]);
+        sim = (i, j) => cosine(cv[i], tv[j]);
+        mode = `embeddings (${model} @ ${threshold})`;
+      } catch (e) { process.stderr.write(`  (embeddings unavailable: ${e instanceof Error ? e.message : e} — falling back)\n`); }
+    }
+    if (!mode) {
+      threshold = Number(process.env.EMBED_THRESHOLD || 0.34);
+      const cw = canonStrings.map(wordSet), tw = targetStrings.map(wordSet);
+      sim = (i, j) => jaccard(cw[i], tw[j]);
+      mode = `token overlap (${stemLabel})`;
+    }
+
+    const canonMatch = canonStrings.map((_, i) => argmax(targetStrings.length, (j) => sim(i, j)));
+    const messages = canonStrings.map((c, i) => ({ value: c, score: Number(canonMatch[i].s.toFixed(3)), represented: canonMatch[i].s >= threshold, match: canonMatch[i].j >= 0 && canonMatch[i].s >= threshold ? targetStrings[canonMatch[i].j] : null }));
+    const offMessage = targetStrings.filter((_, j) => argmax(canonStrings.length, (i) => sim(i, j)).s < threshold);
+    const represented = messages.filter((m) => m.represented).length;
+    return {
+      target: basename(targetPath),
+      mode,
+      coverage: canonStrings.length ? Math.round((represented / canonStrings.length) * 100) : 100,
+      canon: canonStrings.length,
+      surface: targetStrings.length,
+      messages,
+      offMessage,
+    };
+  },
+  render: (out) => {
+    const trunc = (s, n = 50) => (s.length > n ? s.slice(0, n) + "…" : s);
+    const lines = [
+      `\n  CONCEPT DRIFT (string-level) — ${out.target} vs the brand canon\n  ${"─".repeat(58)}`,
+      `  ${out.coverage}% of ${out.canon} canon messages represented · ${out.offMessage.length}/${out.surface} surface strings off-message · ${out.mode}`,
+      `\n  CANON MESSAGES → best surface match`,
+      ...out.messages.map((m) => `     ${m.represented ? "✓" : "✗"} "${trunc(m.value)}"  (${m.score.toFixed(2)})${m.represented ? `  ← "${trunc(m.match ?? "", 38)}"` : "   — MISSING / drifted"}`),
+      ...(out.offMessage.length ? [`\n  OFF-MESSAGE — surface strings matching no canon message`, ...out.offMessage.slice(0, 10).map((s) => `     · "${trunc(s)}"`)] : []),
+      `\n  signal, not a gate. Strings are the unit (like translation): does each canon message land, what's off-message?\n`,
+    ];
+    return lines.map((l) => l + "\n").join("");
+  },
+});
+
+export const registry = { audit: auditVerb, extract: extractVerb, scan: scanVerb, "concept-drift": conceptDriftVerb };
