@@ -2,7 +2,7 @@
 // shape + response parsing (the live call itself is a keyed run, not tested here).
 import assert from "node:assert/strict";
 import { buildRequest, parseResponse } from "./anthropic.mjs";
-import { aiIsms, overclaims, spellCheck, proofread, readability, registryDrift, vocabFromRegistry } from "./prose.mjs";
+import { aiIsms, overclaims, spellCheck, proofread, readability, registryDrift, vocabFromToolset } from "./prose.mjs";
 import { valeLint, valeEnabled } from "./vale.mjs";
 import { textlintEnabled, textlintLint } from "./textlint.mjs";
 import { auditVerb, extractVerb, registry } from "./verbs.mjs";
@@ -87,8 +87,9 @@ assert.equal(textlintEnabled(), false, "textlint provider is off unless AUDIT_TE
 assert.deepEqual(await textlintLint("anything"), [], "textlint provider is a no-op when off");
 
 // ── registry-aware drift check (issue #22, Direction 2) ─────────────────────────
-const minReg = { audit: { input: { shape: { catalog: {}, store: { options: ["fs", "cas", "socket"] } } } } };
-const minVocab = vocabFromRegistry(minReg);
+// Vocab is built from the projected MCP tool schema (#27) — { name, inputSchema } — not Zod internals.
+const minToolset = [{ name: "audit", inputSchema: { properties: { catalog: {}, store: { enum: ["fs", "cas", "socket"] } } } }];
+const minVocab = vocabFromToolset(minToolset);
 assert.equal(registryDrift("Clean headline copy.", "headline", minVocab).length, 0, "no flag refs → no drift findings");
 assert.equal(registryDrift("Run `string-audit audit` to check.", "body", minVocab).length, 0, "known bin+verb pair → no drift");
 assert.ok(registryDrift("Run `string-audit analyze` to scan.", "body", minVocab).some((f) => f.level === "error" && /analyze/.test(f.msg)), "unknown verb → error");
@@ -98,6 +99,14 @@ assert.ok(registryDrift("Use STORE=redis for the backend.", "body", minVocab).so
 assert.ok(registryDrift("Use STORE=socket for the backend.", "body", minVocab).length === 0, "valid enum value → no drift");
 assert.equal(registryDrift("Run `string-audit audit` now.", "cta", minVocab).length, 0, "cta type is skipped (not tool-doc copy)");
 assert.equal(registryDrift(null, "body", null).length, 0, "no vocab → graceful no-op");
+
+// #27 — vocab from the REAL projected registry (not Zod internals): a verbspec/zod bump
+// that breaks the MCP projection fails HERE, instead of silently false-positiving valid flags.
+const realVocab = vocabFromToolset(Object.values(registry).map((vb) => toMcpTool(vb)));
+assert.ok(realVocab.flags.has("catalog") && realVocab.flags.has("store"), "real registry projects its flags");
+assert.ok(realVocab.verbIds.has("audit") && realVocab.verbIds.has("extract"), "real registry projects its verb ids");
+assert.equal(registryDrift("Pass --catalog and --store to audit.", "body", realVocab).length, 0, "valid registry flags never false-positive");
+assert.equal(registryDrift("Pass --catalog now.", "body", vocabFromToolset([])).length, 0, "degraded vocab (empty projection) no-ops — no false errors");
 
 console.log("✓ prose checks verified — { level, msg } + ai-isms + overclaims + proofread + readability + vale gate + registry-drift");
 
