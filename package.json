@@ -1,6 +1,6 @@
 {
   "name": "@bounded-systems/string-audit",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Cost-aware, grounded content auditor — typed string symbols, type-scoped audits, CAS-memoized LLM calls.",
   "type": "module",
   "bin": {

@@ -90,6 +90,8 @@ Same `get/put/has` port, three backings:
   home for the socket "door"; the CAS blobs/refs/lineage live under `<room>/cas`.
 
 ## Status
-v0.1 — runnable. Deterministic + caching + grounding verified; the Anthropic path is
-implemented (live-verify with a key). See open issues for productionization
-(`cas`/`anchored-chain` backing, real `strings.json` catalog).
+v0.3 — runnable. Deterministic + caching + grounding verified; the Anthropic path is
+implemented (live-verify with a key). Copy-hygiene suite (ai-isms, overclaims, proofread,
+readability) with data-driven [`ai-tells.json`](ai-tells.json) rules + first-class
+severity. See open issues for productionization (`cas`/`anchored-chain` backing, real
+`strings.json` catalog, the optional Vale provider — #6).
