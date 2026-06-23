@@ -5,15 +5,15 @@ Throwaway-ish experiments toward [issue #6](https://github.com/bounded-systems/s
 imported by `audit.mjs` / `test.mjs`, so it can't affect CI or the shipped checks. Each is
 zero-dep and runnable on its own.
 
-> **Promoted:** the data-driven path landed in production — `aiIsms()`/`overclaims()` and
-> the rest of `prose.mjs` now emit first-class `{ level, msg }`, backed by the canonical
-> [`../ai-tells.json`](../ai-tells.json). The spikes below now read that same root file, so
-> they can't drift from what ships. (#6 proposals 1 & 3 — done.)
+> **Promoted (all three proposals landed):** the data-driven path is in production —
+> `aiIsms()`/`overclaims()` and the rest of `prose.mjs` emit first-class `{ level, msg }`,
+> backed by the canonical [`../ai-tells.json`](../ai-tells.json) (#6 1 & 3). The optional
+> Vale provider now lives at [`../vale.mjs`](../vale.mjs), gated on `AUDIT_VALE=1` and wired
+> into `audit.mjs` (#6 2). Only the demo below remains here.
 
 | Spike | What it explores | Run |
 |---|---|---|
-| `vale-rules.mjs` | Data-driven scan over the (now root) `ai-tells.json` returning **structured `{ level, msg }`** findings — the shape `prose.mjs` adopted. | `node spikes/vale-rules.mjs` |
-| `vale-provider.mjs` | **Optional** shell-out to the `vale` binary when installed, mapped to the same `{ level, msg }` shape; a graceful no-op otherwise (#6 proposal 2 — still open). | `node spikes/vale-provider.mjs` |
+| `vale-rules.mjs` | Data-driven scan over the (now root) `ai-tells.json` returning **structured `{ level, msg }`** findings — the shape `prose.mjs` adopted. (Production reads the same file; this is just a standalone demo.) | `node spikes/vale-rules.mjs` |
 
 ## The direction these point at
 

@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { buildRequest, parseResponse } from "./anthropic.mjs";
 import { aiIsms, overclaims, spellCheck, proofread, readability } from "./prose.mjs";
+import { valeLint, valeEnabled } from "./vale.mjs";
 
 // request shape
 const req = buildRequest({ type: "headline", value: "Hello world", grounding: ["fact-a", "fact-b"] });
@@ -58,4 +59,12 @@ assert.equal(spellCheck("It isn't broken and we're fine").length, 0, "contractio
 assert.ok(hits(readability(("word ".repeat(30)).trim(), "body"), /long sentence/), "catches over-long sentence");
 assert.equal(readability("Shows photos sent by text.", "body").length, 0, "short, plain copy → no readability flag");
 
-console.log("✓ prose checks verified — { level, msg } + ai-isms + overclaims + proofread + readability");
+// ── voice-safe levels (downstream note: intentional em-dash voice must not gate) ─
+assert.equal(aiIsms("It isn't a frame — it's a window.").find((f) => /antithesis/.test(f.msg)).level, "suggestion", "em-dash antithesis is suggestion, not warn");
+assert.equal(aiIsms("Built it — shipped it — loved it — done.").find((f) => /em-dash/.test(f.msg)).level, "suggestion", "em-dash cadence is suggestion, not warn");
+
+// ── optional Vale provider (opt-in via AUDIT_VALE) ──────────────────────────────
+assert.equal(valeEnabled(), false, "vale provider is off unless AUDIT_VALE is set");
+assert.deepEqual(valeLint("anything"), [], "vale provider is a no-op when off / vale absent");
+
+console.log("✓ prose checks verified — { level, msg } + ai-isms + overclaims + proofread + readability + vale gate");

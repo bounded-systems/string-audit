@@ -66,9 +66,11 @@ export function aiIsms(value) {
   }
   // ── structural tells that aren't simple regex (stay in code), all warn ──
   const warn = (msg) => out.push({ level: "warn", msg });
-  // em-dash cadence: 3+ em/en dashes — more than a single legitimate parenthetical pair
+  // em-dash cadence: 3+ em/en dashes — more than a single legitimate parenthetical pair.
+  // Kept at `suggestion`, never `warn`: voice-forward copy uses em-dashes intentionally,
+  // so it must not light up a gate keyed on warn/error (downstream note, consumers' body).
   const dashes = (value.match(/[—–]/g) || []).length;
-  if (dashes >= 3) warn(`ai-ism: ${dashes} em-dashes — AI cadence; vary the punctuation`);
+  if (dashes >= 3) out.push({ level: "suggestion", msg: `ai-ism: ${dashes} em-dashes — AI cadence; vary the punctuation` });
   const clauses = value.split(/[.;:!?—–]\s*|,\s+/).map((c) => c.trim()).filter(Boolean);
   const lead = (c) => (c.match(/^[a-z']+/i) || [""])[0].toLowerCase();
   // rule-of-three (a): anaphora — 3+ consecutive clauses opening with the same word

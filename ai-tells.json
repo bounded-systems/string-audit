@@ -8,7 +8,7 @@
     { "re": "\\butm_source=chatgpt\\b", "flags": "i", "why": "ChatGPT tracking URL", "level": "error" },
     { "re": "\\blorem ipsum\\b", "flags": "i", "why": "placeholder text shipped", "level": "error" },
 
-    { "re": "\\b(?:isn'?t|aren'?t|wasn'?t|weren'?t|won'?t|don'?t|doesn'?t|not)\\b[^.?!—–]{1,50}[—–][^.?!]{0,50}\\b(?:it'?s|that'?s|but|they'?re|we'?re|it is|that is)\\b", "flags": "i", "why": "antithesis \"it isn't X — it's Y\" cadence", "level": "warn" },
+    { "re": "\\b(?:isn'?t|aren'?t|wasn'?t|weren'?t|won'?t|don'?t|doesn'?t|not)\\b[^.?!—–]{1,50}[—–][^.?!]{0,50}\\b(?:it'?s|that'?s|but|they'?re|we'?re|it is|that is)\\b", "flags": "i", "why": "antithesis \"it isn't X — it's Y\" cadence", "level": "suggestion" },
     { "re": "\\bnot\\s+(?:just|only|merely|simply|about)\\b[^.?!]{1,50},\\s*(?:but|it'?s|they'?re|it is|we)\\b", "flags": "i", "why": "\"not just X, it's Y\" cadence", "level": "warn" },
     { "re": "\\bthe\\s+(?:easy|simple|fun|hard|tricky|tough|real|interesting|important)\\s+part\\b", "flags": "i", "why": "\"the [easy/hard] part\" framing", "level": "warn" },
     { "re": "\\b(?:the\\s+(?:best part|result|catch|kicker|bottom line|takeaway)\\s*\\?|sound familiar\\?|here'?s the (?:thing|kicker|catch)|but here'?s)", "flags": "i", "why": "rhetorical teaser fragment", "level": "warn" },
