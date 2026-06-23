@@ -14,6 +14,9 @@
 //
 //   node spikes/registry-drift.mjs                         # demo on sample copy
 //   node spikes/registry-drift.mjs "the --cache flag, STORE=redis"
+//
+// PROMOTED: vocabFromRegistry + registryDrift → prose.mjs (issue #22 follow-up to this spike).
+// The spike remains as a zero-dep demo and as the origin memo for the production implementation.
 
 // Build the drift vocabulary from a verbspec registry ({ id → VerbSpec }). Reads flag
 // names from each verb's Zod input shape + enum options where present. Operates on the
@@ -73,7 +76,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   ];
   console.log(`\n  REGISTRY-DRIFT SPIKE — copy vs the verbspec registry\n  ${"─".repeat(52)}`);
   for (const s of samples) {
-    console.log(`\n  “${s.slice(0, 64)}${s.length > 64 ? "…" : ""}”`);
+    console.log(`\n  "${s.slice(0, 64)}${s.length > 64 ? "…" : ""}"`);
     const f = registryDrift(s, vocab);
     if (!f.length) console.log("       (no drift)");
     for (const x of f) console.log(`       ✗ ${x.msg}`);
