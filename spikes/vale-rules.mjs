@@ -14,7 +14,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const RULES = JSON.parse(readFileSync(join(here, "ai-tells.json"), "utf8"));
+// The rules were promoted to the repo root (issue #6) and now back prose.mjs's aiIsms();
+// this spike reads the same canonical file so it can't drift from production.
+const RULES = JSON.parse(readFileSync(join(here, "..", "ai-tells.json"), "utf8"));
 const compiled = RULES.patterns.map((p) => ({ re: new RegExp(p.re, p.flags || ""), why: p.why, level: p.level }));
 
 // → [{ level: "error"|"warn"|"suggestion", msg }]

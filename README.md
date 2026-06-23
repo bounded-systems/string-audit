@@ -34,8 +34,11 @@ Run on every symbol, every run (cheap, never cached):
 - **grammar/style** — write-good (passive, wordiness, weasel words).
 - **ai-isms** — the formulaic tells of machine-written copy: `it isn't X — it's Y`
   antithesis, `the easy part … the hard part`, rule-of-three triads, em-dash cadence,
-  rhetorical teaser fragments, and buzzword filler (`delve`, `seamless`, `leverage`,
-  `unlock`, `robust` …). Each finding names the tell so a human can rewrite it.
+  rhetorical teaser fragments, chatbot artifacts/placeholders, and buzzword filler
+  (`delve`, `seamless`, `leverage`, `unlock`, `robust` …). The patterns + lexicon are
+  **data** in [`ai-tells.json`](ai-tells.json) (each rule carries its own severity), so
+  they track the upstream corpus instead of living in code; the structural tells (dash
+  count, anaphora, tricolons) stay in `prose.mjs`.
 - **overclaims** — absolute, unprovable language bound to a coverage term (`every
   privileged effect`, `always enforced`); scope it or link a source. The prose analogue
   of the grounding check — ordinary `never`/`always` in plain prose is left alone.
@@ -46,8 +49,9 @@ Run on every symbol, every run (cheap, never cached):
   genuinely dense prose by Flesch reading-ease. A proxy for "why am I reading this?".
 - **overlap** — symbols whose copy is duplicated or near-duplicate.
 
-Findings carry **severity tiers** (à la Vale): `✗` correctness/honesty (ungrounded,
-typos) · `⚠` ai-ism/proofread · `·` suggestion.
+Every finding carries a first-class **severity** `{ level, msg }` — `error` `✗`
+(correctness/honesty: ungrounded, typos, overclaims) · `warn` `⚠` (ai-ism/proofread) ·
+`suggestion` `·` — and `audit.mjs` renders the glyph from `level` (à la Vale severities).
 
 The rules come from a cold read of the public copy ("AI-isms make me want to die"; "not
 sure if proof read"; "never claim *every* privileged effect"). The keyed Anthropic

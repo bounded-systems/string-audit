@@ -20,34 +20,42 @@ assert.throws(() => parseResponse({ content: [{ type: "text", text: "no tool" }]
 
 console.log("✓ anthropic path verified — request shape + response parsing (no live call)");
 
+// Prose checks now return { level, msg }. Helper: does any finding's msg match?
+const hits = (findings, re) => findings.some((f) => re.test(f.msg));
+
+// ── prose: the { level, msg } contract ──────────────────────────────────────────
+const sample = aiIsms("It isn't a frame — it's a window.");
+assert.ok(sample.every((f) => f.msg && ["error", "warn", "suggestion"].includes(f.level)), "findings carry { level, msg }");
+assert.ok(hits(aiIsms("As an AI language model, I can't help."), /chatbot|refusal/) , "data-driven error rule fires");
+assert.ok(aiIsms("As an AI language model, I can't help.").some((f) => f.level === "error"), "chatbot artifact is error-level");
+
 // ── prose: AI-isms (cold-read rule 4) ──────────────────────────────────────────
-assert.ok(aiIsms("It isn't a frame — it's a window.").some((f) => /antithesis/.test(f)), "catches \"it isn't X — it's Y\"");
-assert.ok(aiIsms("Setup is the easy part.").some((f) => /easy.*part/i.test(f)), "catches \"the easy part\" framing");
-assert.ok(aiIsms("Fast, simple, and reliable.").some((f) => /rule-of-three/.test(f)), "catches rule-of-three triad");
-assert.ok(aiIsms("We leverage a robust, seamless platform.").some((f) => /filler/.test(f)), "catches buzzword filler");
-assert.ok(aiIsms("Built it — shipped it — loved it — done.").some((f) => /em-dash/.test(f)), "catches em-dash cadence (3+)");
-assert.ok(aiIsms("It reaches past it — touching files, running a command, doing something else.").some((f) => /tricolon/.test(f)), "catches gerund tricolon (rule-of-three)");
+assert.ok(hits(sample, /antithesis/), "catches \"it isn't X — it's Y\"");
+assert.ok(hits(aiIsms("Setup is the easy part."), /easy.*part/i), "catches \"the easy part\" framing");
+assert.ok(hits(aiIsms("Fast, simple, and reliable."), /rule-of-three/), "catches rule-of-three triad");
+assert.ok(hits(aiIsms("We leverage a robust, seamless platform."), /filler/), "catches buzzword filler");
+assert.ok(hits(aiIsms("Built it — shipped it — loved it — done."), /em-dash/), "catches em-dash cadence (3+)");
+assert.ok(hits(aiIsms("It reaches past it — touching files, running a command, doing something else."), /tricolon/), "catches gerund tricolon");
 assert.equal(aiIsms("The frame that fills itself with photos").length, 0, "clean copy → no ai-isms");
-assert.equal(aiIsms("A capability model — the core idea — applied here.").filter((f) => /em-dash/.test(f)).length, 0, "a single parenthetical em-dash pair is fine");
+assert.equal(aiIsms("A capability model — the core idea — applied here.").filter((f) => /em-dash/.test(f.msg)).length, 0, "a single parenthetical em-dash pair is fine");
 
 // ── prose: overclaims (cold-read rule 5 / Lane C honesty) ───────────────────────
-assert.ok(overclaims("Secures every privileged effect.").some((f) => /every/.test(f)), "flags the \"every privileged effect\" coverage overclaim");
+assert.ok(hits(overclaims("Secures every privileged effect."), /every/), "flags the \"every privileged effect\" coverage overclaim");
 assert.ok(overclaims("Guaranteed to work.").length >= 1, "flags 'guaranteed'");
 assert.equal(overclaims("No subscription required.").length, 0, "scoped copy → no overclaim");
 assert.equal(overclaims("doing something you never asked for").length, 0, "ordinary 'never' (no coverage term) is not an overclaim");
 assert.equal(overclaims("never the credential behind it").length, 0, "ordinary 'never' (no coverage term) is not an overclaim");
 
 // ── prose: proofread ("was this proof read?") ───────────────────────────────────
-assert.ok(proofread("the the frame").some((f) => /doubled word/.test(f)), "catches doubled word");
-assert.ok(proofread("photos by text,email or web").some((f) => /after comma/.test(f)), "catches missing space after comma");
-assert.ok(proofread("Great frame !").some((f) => /space before/.test(f)), "catches space before punctuation");
-assert.ok(proofread("It’s a \"gem\"").some((f) => /mixed/.test(f)), "catches mixed straight + curly quotes");
+assert.ok(hits(proofread("the the frame"), /doubled word/), "catches doubled word");
+assert.ok(hits(proofread("photos by text,email or web"), /after comma/), "catches missing space after comma");
+assert.ok(hits(proofread("Great frame !"), /space before/), "catches space before punctuation");
+assert.ok(hits(proofread("It’s a \"gem\""), /mixed/), "catches mixed straight + curly quotes");
 assert.equal(proofread("A clean, well-written line.").length, 0, "clean copy → no proofread flags");
-// contractions are no longer flagged as misspellings
 assert.equal(spellCheck("It isn't broken and we're fine").length, 0, "contractions aren't misspellings");
 
 // ── prose: readability ("why am I reading this?") ───────────────────────────────
-assert.ok(readability(("word ".repeat(30)).trim(), "body").some((f) => /long sentence/.test(f)), "catches over-long sentence");
+assert.ok(hits(readability(("word ".repeat(30)).trim(), "body"), /long sentence/), "catches over-long sentence");
 assert.equal(readability("Shows photos sent by text.", "body").length, 0, "short, plain copy → no readability flag");
 
-console.log("✓ prose checks verified — ai-isms + overclaims + proofread + readability");
+console.log("✓ prose checks verified — { level, msg } + ai-isms + overclaims + proofread + readability");

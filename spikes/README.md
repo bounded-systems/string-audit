@@ -5,11 +5,15 @@ Throwaway-ish experiments toward [issue #6](https://github.com/bounded-systems/s
 imported by `audit.mjs` / `test.mjs`, so it can't affect CI or the shipped checks. Each is
 zero-dep and runnable on its own.
 
+> **Promoted:** the data-driven path landed in production — `aiIsms()`/`overclaims()` and
+> the rest of `prose.mjs` now emit first-class `{ level, msg }`, backed by the canonical
+> [`../ai-tells.json`](../ai-tells.json). The spikes below now read that same root file, so
+> they can't drift from what ships. (#6 proposals 1 & 3 — done.)
+
 | Spike | What it explores | Run |
 |---|---|---|
-| `ai-tells.json` | The AI-tell **rules as data** — patterns + lexicon, each carrying a severity `level` (error / warn / suggestion). Seeded from `vale-signs-of-ai-writing` + Wikipedia's *Signs of AI writing*. | — |
-| `vale-rules.mjs` | Data-driven scan over `ai-tells.json` returning **structured `{ level, msg }`** findings — the "port the rules + first-class severity" direction (#6 proposals 1 & 3). | `node spikes/vale-rules.mjs` |
-| `vale-provider.mjs` | **Optional** shell-out to the `vale` binary when installed, mapped to the same `{ level, msg }` shape; a graceful no-op otherwise (#6 proposal 2). | `node spikes/vale-provider.mjs` |
+| `vale-rules.mjs` | Data-driven scan over the (now root) `ai-tells.json` returning **structured `{ level, msg }`** findings — the shape `prose.mjs` adopted. | `node spikes/vale-rules.mjs` |
+| `vale-provider.mjs` | **Optional** shell-out to the `vale` binary when installed, mapped to the same `{ level, msg }` shape; a graceful no-op otherwise (#6 proposal 2 — still open). | `node spikes/vale-provider.mjs` |
 
 ## The direction these point at
 
