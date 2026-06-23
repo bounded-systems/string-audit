@@ -31,6 +31,21 @@ ANTHROPIC_API_KEY=… node audit.mjs   # real audits — only on cache-misses
   the Anthropic tool surface (`toAnthropicTool`), so its schema can't drift from the
   CLI / MCP projections of the same verb.
 
+## Surfaces — one verb, many projections
+`audit` and `extract` are [`verbspec`](https://github.com/bounded-systems/verbspec)
+`VerbSpec`s (typed Zod input/output) in [`verbs.mjs`](verbs.mjs); each surface is a
+projection of the same contract — `run` computes the structured `output`, `render` is the
+human CLI view, and MCP / agents consume `output` directly:
+- **CLI** — `node audit.mjs` / `node extract.mjs <surface.html>` (the `string-audit` bin).
+  The env knobs still work (`CATALOG`, `GROUNDING`, `STORE`, `AUDIT_VERSION`, `AUDIT_VALE`,
+  `ANTHROPIC_API_KEY`); flags override the runtime-read ones (`--catalog`, `--grounding`,
+  `--store`, `--version`, `--vale`). `--help` is generated from the schema.
+- **MCP** — `node mcp.mjs` (the `string-audit-mcp` bin) is a stdio MCP server exposing
+  `audit` + `extract` as tools: `tools/list` is the projected toolset, `tools/call`
+  validates arguments against the verb's Zod input and runs it. So an agent can audit copy
+  or extract a surface as a tool call.
+- **Anthropic** — the `report` tool (above) is the same projection (`toAnthropicTool`).
+
 ## Copy hygiene — deterministic prose checks
 Run on every symbol, every run (cheap, never cached):
 - **spell** — modern wordlist ∪ `dictionary.txt` (brand terms).

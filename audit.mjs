@@ -1,116 +1,21 @@
 #!/usr/bin/env node
-// string-audit spike — typed symbols, type-scoped audits, CAS-memoized.
-// Deterministic local checks stand in for the LLM audit so the spike runs offline;
-// the real Anthropic call plugs into the cache-MISS path (marked below). Re-running
-// is free for unchanged symbols — only the diff costs an API call.
+// `string-audit` — the `audit` verb (verbs.mjs) projected to a CLI via verbspec.
+// Same env knobs as ever (CATALOG, GROUNDING, STORE, ROOM/SOCK, AUDIT_VERSION,
+// AUDIT_MODEL, AUDIT_VALE, ANTHROPIC_API_KEY); --catalog/--grounding/--store/--version/
+// --vale flags override the runtime-read ones. Re-running is free for unchanged symbols.
 //
-//   node audit.mjs           # audit; second run = 0 calls (all cached)
-//   AUDIT_VERSION=2 node …   # bump to invalidate the whole cache intentionally
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-import { createHash } from "node:crypto";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { auditWithAnthropic } from "./anthropic.mjs";
-import { spellCheck, grammarCheck, aiIsms, overclaims, proofread, readability, findOverlaps } from "./prose.mjs";
-import { valeLint } from "./vale.mjs"; // opt-in (AUDIT_VALE=1); no-op otherwise
-import { loadCatalog } from "./catalog.mjs";
-import { makeStore } from "./store.mjs";
+//   node audit.mjs                 # audit; second run = 0 calls (all cached)
+//   node audit.mjs --store=cas     # back the cache with cas + anchored-chain
+//   AUDIT_VERSION=2 node audit.mjs # bump to invalidate the whole cache intentionally
+//   node audit.mjs --help
+import { parseArgs, toHelp } from "@bounded-systems/verbspec";
+import { auditVerb } from "./verbs.mjs";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const AUDIT_VERSION = process.env.AUDIT_VERSION || "1";
-const cacheDir = join(here, ".cache");
-mkdirSync(cacheDir, { recursive: true });
-const catalog = loadCatalog(process.env.CATALOG || join(here, "catalog.json")); // CATALOG=<real strings.json> to audit live content
-const useLLM = !!process.env.ANTHROPIC_API_KEY; // real audits when keyed; deterministic otherwise
-
-// grounding source — the only facts a `claim` may assert. External + configurable
-// (GROUNDING=<path>); per-catalog grounding is the right production source.
-const groundingFile = [
-  process.env.GROUNDING,                                                       // explicit
-  process.env.CATALOG && join(dirname(process.env.CATALOG), "grounding.json"), // per-catalog (sibling)
-  join(here, "grounding.json"),                                                // default
-].filter(Boolean).find(existsSync);
-const GROUNDED = groundingFile ? JSON.parse(readFileSync(groundingFile, "utf8")) : [];
-
-const sha = (s) => createHash("sha256").update(s).digest("hex").slice(0, 16);
-const cacheKey = (type, value) => sha(`${AUDIT_VERSION}:${type}:${value}`);
-
-// type → audit (deterministic stand-in; the LLM call goes where noted on a miss)
-const AUDITS = {
-  headline: (v) => [
-    v.length > 65 && "too long for a headline (>65)",
-    v.length < 15 && "too short to carry the value prop",
-    /\b(best|amazing|world-class|revolutionary)\b/i.test(v) && "superlative filler",
-  ].filter(Boolean),
-  cta: (v) => [
-    !/^(shop|get|buy|try|start|send|order|gift)\b/i.test(v.trim()) && "doesn't open with an action verb",
-    v.length > 24 && "CTA too long to scan",
-  ].filter(Boolean),
-  meta: (v) => [
-    v.length > 160 && `meta ${v.length}>160 chars`,
-    v.length < 70 && "meta thin (<70)",
-  ].filter(Boolean),
-  claim: (v) => {
-    const stat = v.match(/\b\d[\d,. ]*\s*(%|stars?|customers?|reviews?|bpm|days?|x)\b/i);
-    const grounded = GROUNDED.some((g) => v.toLowerCase().includes(g));
-    return [
-      stat && !grounded && `UNGROUNDED stat "${stat[0].trim()}" — not in the grounding source; flag, never ship/rewrite as fact`,
-      !stat && !grounded && "claim asserts nothing grounded — verify against source",
-    ].filter(Boolean);
-  },
-};
-
-const run = (type, value) => {
-  const findings = (AUDITS[type] || (() => []))(value);
-  return { score: Math.max(0, 10 - 2 * findings.length), findings };
-};
-
-const store = await makeStore(cacheDir); // FsStore (default) | CasStore (STORE=cas)
-let hits = 0, misses = 0;
-const results = {};
-for (const [symbol, { type, value }] of Object.entries(catalog)) {
-  const key = cacheKey(type, value);
-  let r = await store.has(key) ? await store.get(key) : null, cached = !!r;
-  if (cached) hits++;
-  else {
-    // ───── cache MISS: the expensive call. Real Anthropic audit when keyed. ─────
-    r = useLLM ? await auditWithAnthropic({ type, value, grounding: GROUNDED }) : run(type, value);
-    await store.put(key, r);
-    misses++;
-  }
-  results[symbol] = { type, ...r, cached };
+const argv = process.argv.slice(2);
+if (argv.includes("--help") || argv.includes("-h")) {
+  // single-verb bin: drop verbspec's `<bin> <verb>` prefix (no `audit` subcommand here).
+  console.log(toHelp(auditVerb, "node audit.mjs").replace("node audit.mjs audit", "node audit.mjs"));
+  process.exit(0);
 }
-
-// run-to-run deltas (the ▲▼ view), per symbol
-const lastFile = join(here, ".last.json");
-const last = existsSync(lastFile) ? JSON.parse(readFileSync(lastFile, "utf8")) : {};
-writeFileSync(lastFile, JSON.stringify(Object.fromEntries(Object.entries(results).map(([s, r]) => [s, r.score]))));
-
-console.log(`\n  STRING AUDIT — ${Object.keys(catalog).length} symbols · audit v${AUDIT_VERSION} · ${useLLM ? "anthropic" : "deterministic"}\n  ${"─".repeat(52)}`);
-for (const [s, r] of Object.entries(results)) {
-  const prev = last[s];
-  const d = prev == null ? "" : r.score > prev ? ` ▲+${r.score - prev}` : r.score < prev ? ` ▼${r.score - prev}` : "";
-  console.log(`  ${r.cached ? "·" : "✦"} ${s.padEnd(20)} [${r.type.padEnd(8)}] ${r.score}/10${d}`);
-  const v = catalog[s].value;
-  // prose checks carry first-class severity ({ level, msg }); the scored, cached
-  // type-audit findings are still strings — classify them into the same model.
-  const prose = [...spellCheck(v), ...grammarCheck(v), ...aiIsms(v), ...overclaims(v), ...proofread(v), ...readability(v, r.type), ...valeLint(v)];
-  const typeLevel = (m) => /UNGROUNDED|grounded/i.test(m) ? "error" : "suggestion";
-  const GLYPH = { error: "✗", warn: "⚠", suggestion: "·" }; // cf. Vale severities
-  const ORDER = { error: 0, warn: 1, suggestion: 2 };
-  const findings = [...r.findings.map((m) => ({ level: typeLevel(m), msg: m })), ...prose]
-    .sort((a, b) => ORDER[a.level] - ORDER[b.level]);
-  for (const f of findings) console.log(`       ${GLYPH[f.level]} ${f.msg}`);
-}
-
-// overlap — symbols whose copy is duplicated/near-duplicate
-const overlaps = findOverlaps(catalog);
-if (overlaps.length) {
-  console.log("\n  OVERLAP — duplicate copy across symbols");
-  for (const g of overlaps) console.log(`     ⧉ ${g.join("  =  ")}`);
-}
-
-console.log(`\n  cache: ${hits} hit (free) · ${misses} miss (= API calls this run)`);
-console.log(`  prose: spell + grammar + ai-isms + overclaims + proofread + readability (uncached)`);
-console.log(`  tiers: ✗ correctness/honesty · ⚠ ai-ism/proofread · · suggestion`);
-console.log(`  ✦ computed   · served from CAS\n`);
+const output = await auditVerb.run(parseArgs(auditVerb, argv));
+process.stdout.write(auditVerb.render(output));
