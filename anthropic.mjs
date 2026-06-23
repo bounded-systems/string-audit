@@ -1,22 +1,38 @@
 // Real Anthropic auditor — runs on a cache MISS when ANTHROPIC_API_KEY is set.
 // Structured output via tool-use (the model must return {score, findings}), a
 // cost-aware default model, and grounding enforced in the system prompt so the
-// auditor flags ungrounded claims instead of inventing facts. Zero-dep (fetch).
+// auditor flags ungrounded claims instead of inventing facts. The HTTP call is
+// dep-free (native fetch); the report-tool schema is projected from a verbspec VerbSpec.
+import { z } from "zod";
+import { defineVerb, toAnthropicTool } from "@bounded-systems/verbspec";
+
 const MODEL = process.env.AUDIT_MODEL || "claude-haiku-4-5-20251001";
 
-const REPORT_TOOL = {
-  name: "report",
-  description: "Report the audit result for one copy string.",
-  input_schema: {
-    type: "object",
-    required: ["score", "findings"],
-    additionalProperties: false,
-    properties: {
-      score: { type: "integer", minimum: 0, maximum: 10, description: "0 = unusable, 10 = excellent for its type." },
-      findings: { type: "array", items: { type: "string" }, description: "Concrete, actionable problems. Empty if none." },
-    },
-  },
-};
+// The `report` tool is authored ONCE as a VerbSpec and projected to the Anthropic
+// tool surface (toAnthropicTool) — the same typed contract a CLI / MCP / OpenAPI
+// projection reads, so the structured-output schema can't drift from them. The model
+// fills `report` with {score, findings}; there is no server-side run (it's a tool-use
+// surface), so output/run are vestigial. parseResponse reads back tool_use.input.
+export const reportVerb = defineVerb({
+  id: "report",
+  summary: "Report the audit result for one copy string.",
+  actor: "audit",
+  input: z.object({
+    score: z.number().int().min(0).max(10).describe("0 = unusable, 10 = excellent for its type."),
+    findings: z.array(z.string()).describe("Concrete, actionable problems. Empty if none."),
+  }),
+  output: z.object({ ok: z.boolean() }).describe("unused — `report` is a tool-use surface, not a runnable verb"),
+  run: () => ({ ok: true }),
+});
+
+// Project to the Anthropic tool definition. z.toJSONSchema stamps a `$schema` draft
+// pointer on the input schema; strip it so the wire payload stays byte-for-byte what
+// the hand-written REPORT_TOOL sent (the Messages API ignores it either way).
+const REPORT_TOOL = (() => {
+  const tool = toAnthropicTool(reportVerb);
+  const { $schema, ...input_schema } = tool.input_schema;
+  return { ...tool, input_schema };
+})();
 
 const system = (type, grounding) =>
   `You audit a single "${type}" copy string for a product.

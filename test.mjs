@@ -10,6 +10,18 @@ const req = buildRequest({ type: "headline", value: "Hello world", grounding: ["
 assert.equal(req.tool_choice.name, "report", "forces the report tool (structured output)");
 assert.ok(req.tools[0].input_schema.required.includes("score"), "schema requires score");
 assert.ok(req.tools[0].input_schema.required.includes("findings"), "schema requires findings");
+// The tool is single-sourced from a VerbSpec (anthropic.mjs, projected via toAnthropicTool);
+// pin the exact projected schema so a verbspec/zod bump can't silently drift the contract
+// (no $schema pointer; integer 0..10; string[]; additionalProperties:false).
+assert.deepEqual(req.tools[0].input_schema, {
+  type: "object",
+  properties: {
+    score: { type: "integer", minimum: 0, maximum: 10, description: "0 = unusable, 10 = excellent for its type." },
+    findings: { type: "array", items: { type: "string" }, description: "Concrete, actionable problems. Empty if none." },
+  },
+  required: ["score", "findings"],
+  additionalProperties: false,
+}, "report tool projects to the pinned Anthropic contract");
 assert.ok(req.system.includes("fact-a") && req.system.includes("fact-b"), "grounding enforced in system prompt");
 assert.equal(req.messages[0].content, "Hello world", "audits the given copy");
 

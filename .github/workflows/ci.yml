@@ -1,10 +1,11 @@
 name: ci
 
-# Content-audit pipeline: install (prose only) → audit (deterministic) → cache invariant
-# → extract+coverage → optionally install the CAS backends and exercise the socket store.
-# The core path stays JSR-free (npm ci --omit=optional); cas/anchored-chain are optional
-# deps installed on demand only for the socket-store step, so npm.jsr.io flakiness can't
-# break the default pipeline.
+# Content-audit pipeline: install (core) → audit (deterministic) → cache invariant
+# → extract+coverage → install the optional CAS backends and exercise the socket store.
+# The core install (npm ci --omit=optional) pulls the runtime deps — prose tools +
+# verbspec (the typed report-tool contract). Only the heavy cas/anchored-chain
+# signing/CAS backends are optional, installed on demand for the socket-store step, so
+# their npm.jsr.io fetch can't break the default pipeline.
 on:
   push:
     branches: [main]
@@ -21,7 +22,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
-      - name: Install — prose deps only, no JSR/CAS backends (wordlist + write-good)
+      - name: Install — core deps (prose tools + verbspec), no CAS backends
         run: npm ci --omit=optional
       - name: Test — anthropic path (request shape + parsing)
         run: node test.mjs
