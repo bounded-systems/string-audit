@@ -5,11 +5,13 @@
   "type": "module",
   "bin": {
     "string-audit": "audit.mjs",
-    "string-audit-mcp": "mcp.mjs"
+    "string-audit-mcp": "mcp.mjs",
+    "string-audit-scan": "scan.mjs"
   },
   "scripts": {
     "audit": "node audit.mjs",
     "extract": "node extract.mjs",
+    "scan": "node scan.mjs",
     "mcp": "node mcp.mjs",
     "test": "node test.mjs"
   },

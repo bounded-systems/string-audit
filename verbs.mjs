@@ -3,14 +3,15 @@
 // OpenAPI/Anthropic projection read one typed contract. `run` computes the structured
 // `output` (what MCP/agents consume); `render` is the human CLI view (the bins print it).
 // CLI knobs default from the same env vars the scripts always used, so `same env/args`.
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { dirname, join, basename } from "node:path";
+import { dirname, join, basename, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { defineVerb, toMcpTool } from "@bounded-systems/verbspec";
 import { auditWithAnthropic } from "./anthropic.mjs";
 import { spellCheck, grammarCheck, aiIsms, overclaims, proofread, readability, findOverlaps, registryDrift, vocabFromToolset } from "./prose.mjs";
+import { typeFindings, claimFindings, inferType, SYMBOL_TYPES } from "./types.mjs";
 import { valeLint } from "./vale.mjs";
 import { textlintLint } from "./textlint.mjs";
 import { loadCatalog } from "./catalog.mjs";
@@ -26,31 +27,6 @@ const GLYPH = { error: "✗", warn: "⚠", suggestion: "·" }; // cf. Vale sever
 const ORDER = { error: 0, warn: 1, suggestion: 2 };
 
 // ── audit ───────────────────────────────────────────────────────────────────────
-// Deterministic type-scoped stand-ins; the LLM call replaces them on a cache miss.
-const deterministicAudits = (GROUNDED) => ({
-  headline: (v) => [
-    v.length > 65 && "too long for a headline (>65)",
-    v.length < 15 && "too short to carry the value prop",
-    /\b(best|amazing|world-class|revolutionary)\b/i.test(v) && "superlative filler",
-  ].filter(Boolean),
-  cta: (v) => [
-    !/^(shop|get|buy|try|start|send|order|gift)\b/i.test(v.trim()) && "doesn't open with an action verb",
-    v.length > 24 && "CTA too long to scan",
-  ].filter(Boolean),
-  meta: (v) => [
-    v.length > 160 && `meta ${v.length}>160 chars`,
-    v.length < 70 && "meta thin (<70)",
-  ].filter(Boolean),
-  claim: (v) => {
-    const stat = v.match(/\b\d[\d,. ]*\s*(%|stars?|customers?|reviews?|bpm|days?|x)\b/i);
-    const grounded = GROUNDED.some((g) => v.toLowerCase().includes(g));
-    return [
-      stat && !grounded && `UNGROUNDED stat "${stat[0].trim()}" — not in the grounding source; flag, never ship/rewrite as fact`,
-      !stat && !grounded && "claim asserts nothing grounded — verify against source",
-    ].filter(Boolean);
-  },
-});
-
 export const auditVerb = defineVerb({
   id: "audit",
   summary: "Audit every catalog symbol (type-scoped + prose), CAS-cached; report scores + findings.",
@@ -98,9 +74,9 @@ export const auditVerb = defineVerb({
     const useLLM = !!process.env.ANTHROPIC_API_KEY;
     const sha = (s) => createHash("sha256").update(s).digest("hex").slice(0, 16);
     const cacheKey = (type, value) => sha(`${AUDIT_VERSION}:${type}:${value}`);
-    const AUDITS = deterministicAudits(GROUNDED);
+    // type-scoped checks from the shared Zod contracts (types.mjs); claim is grounding-aware.
     const runDet = (type, value) => {
-      const findings = (AUDITS[type] || (() => []))(value);
+      const findings = type === "claim" ? claimFindings(value, GROUNDED) : typeFindings(type, value);
       return { score: Math.max(0, 10 - 2 * findings.length), findings };
     };
 
@@ -263,6 +239,105 @@ export const extractVerb = defineVerb({
   },
 });
 
-// One typed registry → CLI bins + the MCP toolset (mcp.mjs). `report` is Anthropic-only
-// (a tool-use surface, not server-callable), so it stays out of the runnable registry.
-export const registry = { audit: auditVerb, extract: extractVerb };
+// ── scan ────────────────────────────────────────────────────────────────────────
+// Static-string extraction over SOURCE (i18n-style): pull every string literal, keep the
+// ones that read like user-facing copy, infer a type and Zod-validate it (types.mjs — the
+// same contracts `audit` uses). All static strings surfaced; Zod + symbols for the keepers.
+const SCAN_IGNORE = new Set(["node_modules", ".git", "vendor", "dist", ".cache", ".room"]);
+const sourceFiles = (dir) => {
+  const out = [];
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    if (e.name.startsWith(".") || SCAN_IGNORE.has(e.name)) continue;
+    const p = join(dir, e.name);
+    if (e.isDirectory()) out.push(...sourceFiles(p));
+    else if (/\.(mjs|js|ts)$/.test(e.name) && !/(^|\.)test\.(mjs|js|ts)$/.test(e.name)) out.push(p); // skip tests (test data ≠ app copy)
+  }
+  return out;
+};
+const isCopy = (s) => {
+  const t = s.trim();
+  if (t.length < 8 || !/[a-z]/i.test(t)) return false;
+  if (!/[a-z]\s+[a-z]/i.test(t)) return false;                          // ≥2 word-ish tokens
+  if (/^(\.{0,2}\/|~\/|https?:|[a-z][\w-]*:\/\/)/.test(t)) return false;  // path / url
+  if (/\.(mjs|js|ts|json|html?|css|svg|png|jpe?g|md|txt|sock|key)\b/i.test(t)) return false; // filename
+  if (/[{}<>|]|=>|\$\{|::|\bconsole\.|\bconst\s|\breturn\s|\bfunction\b/.test(t)) return false; // code
+  if (/^[a-z][a-zA-Z0-9_.-]*$/.test(t)) return false;                   // identifier / dotted key
+  if (!/[A-Z]/.test(t) && !/[.!?]/.test(t)) return false;               // sentence-like
+  return true;
+};
+
+export const scanVerb = defineVerb({
+  id: "scan",
+  summary: "Scan source for hardcoded static strings; type + Zod-validate the keepers.",
+  actor: "audit",
+  input: z.object({
+    dir: z.string().optional().describe("Source root to scan (default: string-audit's own root)."),
+    emit: z.boolean().optional().describe("Emit a DTCG content/strings.json of the keepers (instead of the report)."),
+  }),
+  positionals: ["dir"],
+  output: z.object({
+    dir: z.string(),
+    parser: z.string(),
+    files: z.number(),
+    literals: z.number(),
+    incidental: z.number(),
+    keepers: z.array(z.object({ value: z.string(), type: z.string(), file: z.string(), valid: z.boolean(), error: z.string().nullable() })),
+  }),
+  run: async (input) => {
+    const root = input.dir ?? here;
+    let acorn = null, parser = "regex (heuristic)";
+    try { acorn = await import("acorn"); parser = "acorn AST"; } catch { /* fallback */ } // AST can't be fooled by comments/regexes
+    const literalsOf = (src) => {
+      if (acorn) {
+        const out = [];
+        let ast; try { ast = acorn.parse(src, { ecmaVersion: "latest", sourceType: "module" }); } catch { return out; }
+        const walk = (n) => {
+          if (!n || typeof n !== "object") return;
+          if (Array.isArray(n)) return void n.forEach(walk);
+          if (n.type === "Literal" && typeof n.value === "string") out.push(n.value);
+          else if (n.type === "TemplateLiteral" && n.expressions.length === 0) out.push(n.quasis.map((q) => q.value.cooked).join(""));
+          for (const k in n) if (k !== "type" && n[k] && typeof n[k] === "object") walk(n[k]);
+        };
+        walk(ast);
+        return out;
+      }
+      const out = [];
+      for (const m of src.matchAll(/"((?:[^"\\\n]|\\.)*)"|'((?:[^'\\\n]|\\.)*)'/g)) out.push((m[1] ?? m[2]).replace(/\\(["'\\])/g, "$1"));
+      return out;
+    };
+    const files = sourceFiles(root);
+    let literals = 0;
+    const keepers = [];
+    const seen = new Set();
+    for (const f of files) {
+      for (const s of literalsOf(readFileSync(f, "utf8"))) {
+        literals++;
+        const t = s.trim();
+        if (!isCopy(t) || seen.has(t)) continue;
+        seen.add(t);
+        const type = inferType(t);
+        const schema = SYMBOL_TYPES[type];                  // structural contract (types.mjs); claim's grounding is N/A out of catalog context
+        const r = schema ? schema.safeParse(t) : { success: true };
+        keepers.push({ value: t, type, file: relative(root, f), valid: r.success, error: r.success ? null : r.error.issues[0].message });
+      }
+    }
+    return { dir: basename(root), parser, files: files.length, literals, incidental: literals - keepers.length, keepers };
+  },
+  render: (out) => {
+    const trunc = (s, n = 58) => (s.length > n ? s.slice(0, n) + "…" : s);
+    const invalid = out.keepers.filter((k) => !k.valid).length;
+    const lines = [
+      `\n  STATIC-STRING SCAN — ${out.dir} (${out.parser})\n  ${"─".repeat(52)}`,
+      `  ${out.files} files · ${out.literals} string literals · ${out.keepers.length} keepers (typed copy) · ${out.incidental} incidental`,
+      `\n  KEEPERS — hardcoded copy → propose a typed symbol (Zod-validated)`,
+      ...out.keepers.slice(0, 40).map((k) => `     ${k.valid ? "✓" : "✗"} [${k.type.padEnd(8)}] "${trunc(k.value)}"  ·${k.file}${k.valid ? "" : `  ⚠ ${k.error}`}`),
+      ...(out.keepers.length > 40 ? [`     … and ${out.keepers.length - 40} more`] : []),
+      `\n  ${invalid} keeper(s) violate their type's Zod contract — fix the copy or retype.`,
+      `  --emit to write a content/strings.json of the keepers.\n`,
+    ];
+    return lines.map((l) => l + "\n").join("");
+  },
+});
+
+// One typed registry → CLI bins + the MCP toolset (mcp.mjs). `report` is Anthropic-only.
+export const registry = { audit: auditVerb, extract: extractVerb, scan: scanVerb };

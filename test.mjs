@@ -5,7 +5,8 @@ import { buildRequest, parseResponse } from "./anthropic.mjs";
 import { aiIsms, overclaims, spellCheck, proofread, readability, registryDrift, vocabFromToolset } from "./prose.mjs";
 import { valeLint, valeEnabled } from "./vale.mjs";
 import { textlintEnabled, textlintLint } from "./textlint.mjs";
-import { auditVerb, extractVerb, registry } from "./verbs.mjs";
+import { auditVerb, extractVerb, scanVerb, registry } from "./verbs.mjs";
+import { typeFindings, claimFindings } from "./types.mjs";
 import { toMcpToolset, toMcpTool, parseArgs } from "@bounded-systems/verbspec";
 
 // request shape
@@ -112,7 +113,7 @@ console.log("✓ prose checks verified — { level, msg } + ai-isms + overclaims
 
 // ── verbspec surfaces: audit + extract as VerbSpecs → CLI + MCP (verbs.mjs) ──────
 const toolset = toMcpToolset(registry);
-assert.deepEqual(toolset.map((t) => t.name).sort(), ["audit", "extract"], "registry projects to the audit + extract MCP toolset");
+assert.deepEqual(toolset.map((t) => t.name).sort(), ["audit", "extract", "scan"], "registry projects audit + extract + scan to the MCP toolset");
 assert.ok(toMcpTool(extractVerb).inputSchema.required.includes("file"), "extract MCP tool requires the file argument");
 assert.ok(!toMcpTool(auditVerb).inputSchema.required, "audit MCP tool has no required args (all env-defaulted flags)");
 
@@ -135,4 +136,17 @@ assert.ok(Object.values(ex.tokens).every((t) => t["$value"] && t["$type"] && t["
 assert.ok(Object.keys(ex.tokens).some((k) => k.startsWith("surface.")), "uncovered strings get a proposed surface.* key");
 assert.ok("tagline" in ex.tokens, "a covered string reuses its catalog symbol (tagline), not a proposed key");
 
-console.log("✓ verbspec surfaces verified — audit/extract VerbSpecs → CLI parse + MCP toolset + structured output + extractor");
+// scan: lift hardcoded static strings from source → Zod-typed keepers (shared types.mjs)
+const sc = await scanVerb.run({ dir: "." });
+assert.ok(sc.files > 0 && sc.literals > 0, "scan walks source + finds string literals");
+assert.ok(sc.keepers.length > 0 && sc.keepers.length < sc.literals, "keepers are a subset (copy, not every literal)");
+assert.ok(sc.keepers.every((k) => k.type && typeof k.valid === "boolean"), "each keeper is typed + Zod-validated");
+
+// types.mjs: the per-type Zod contracts — the single source `audit` and `scan` both use
+assert.deepEqual(typeFindings("headline", "The boundary an agent acts through"), [], "a clean headline passes its contract");
+assert.ok(typeFindings("headline", "x".repeat(80)).includes("too long for a headline (>65)"), "an over-long headline fails its contract");
+assert.ok(typeFindings("cta", "Learn more about everything here").includes("doesn't open with an action verb"), "a non-action-verb cta fails its contract");
+assert.equal(claimFindings("Rated 4.8 stars by 12,000 customers.", []).length, 1, "an ungrounded stat is flagged");
+assert.equal(claimFindings("Rated 4.8 stars.", ["4.8 stars"]).length, 0, "a grounded stat passes");
+
+console.log("✓ verbspec surfaces verified — audit/extract/scan VerbSpecs → CLI + MCP + structured output + shared Zod type contracts");

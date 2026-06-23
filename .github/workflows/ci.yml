@@ -49,7 +49,8 @@ jobs:
             | node mcp.mjs)
           echo "$OUT"
           echo "$OUT" | grep -q '"name":"audit"'    # tools/list projects the audit verb
-          echo "$OUT" | grep -q '"name":"extract"'  # ...and the extract verb
+          echo "$OUT" | grep -q '"name":"extract"'  # ...and extract
+          echo "$OUT" | grep -q '"name":"scan"'     # ...and scan
           echo "$OUT" | grep -q 'coverage'          # tools/call runs extract → structured output
       - name: Registry drift spike smoke-test
         run: node spikes/registry-drift.mjs
@@ -59,10 +60,10 @@ jobs:
         run: npm install --include=optional --no-audit --no-fund
       - name: Concept drift spike — stemmed matching (optional stemmer now installed)
         run: node spikes/concept-drift.mjs samples/page.html | grep -q "token overlap (stemmed)"
-      - name: Static-string scan spike — AST extract + Zod-typed keepers, emit round-trips
+      - name: Scan verb — AST extract + Zod-typed keepers, emit round-trips
         run: |
-          node spikes/scan.mjs | grep -q "acorn AST"                 # optional acorn now installed
-          node spikes/scan.mjs --emit > /tmp/scan.json
+          node scan.mjs | grep -q "acorn AST"                         # optional acorn now installed
+          node scan.mjs --emit > /tmp/scan.json
           node -e 'const o=require("/tmp/scan.json");const n=Object.keys(o).filter(k=>!k.startsWith("$")).length;if(!n){process.exit(1)}console.log(n+" keepers")'
           CATALOG=/tmp/scan.json node audit.mjs > /dev/null            # the emitted keepers audit clean
       - name: Room — mount the socket store + audit through it
