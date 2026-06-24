@@ -53,6 +53,11 @@ assert.ok(hits(aiIsms("Fast, simple, and reliable."), /rule-of-three/), "catches
 assert.ok(hits(aiIsms("We leverage a robust, seamless platform."), /filler/), "catches buzzword filler");
 assert.ok(hits(aiIsms("Built it — shipped it — loved it — done."), /em-dash/), "catches em-dash cadence (3+)");
 assert.ok(hits(aiIsms("It reaches past it — touching files, running a command, doing something else."), /tricolon/), "catches gerund tricolon");
+assert.ok(hits(aiIsms("driving whole units of work, not holding a single contract"), /antithesis/), "catches \"X, not Y\" comma-antithesis");
+assert.equal(aiIsms("work, not holding the contract").find((f) => /antithesis/.test(f.msg))?.level, "suggestion", "comma-antithesis is suggestion, not warn");
+assert.ok(hits(aiIsms("That loop is the point."), /emphatic/), "catches \"is the point\" emphatic closer");
+assert.ok(hits(aiIsms("That gap is the whole problem."), /emphatic/), "catches \"is the whole X\" emphatic closer");
+assert.ok(hits(aiIsms("This is essentially a no-op."), /filler/), "catches hedge-adverb filler (essentially)");
 assert.equal(aiIsms("The boundary an agent acts through").length, 0, "clean copy → no ai-isms");
 assert.equal(aiIsms("A capability model — the core idea — applied here.").filter((f) => /em-dash/.test(f.msg)).length, 0, "a single parenthetical em-dash pair is fine");
 
