@@ -10,8 +10,10 @@
 
     { "re": "\\b(?:isn'?t|aren'?t|wasn'?t|weren'?t|won'?t|don'?t|doesn'?t|not)\\b[^.?!—–]{1,50}[—–][^.?!]{0,50}\\b(?:it'?s|that'?s|but|they'?re|we'?re|it is|that is)\\b", "flags": "i", "why": "antithesis \"it isn't X — it's Y\" cadence", "level": "suggestion" },
     { "re": "\\bnot\\s+(?:just|only|merely|simply|about)\\b[^.?!]{1,50},\\s*(?:but|it'?s|they'?re|it is|we)\\b", "flags": "i", "why": "\"not just X, it's Y\" cadence", "level": "warn" },
+    { "re": "\\w,\\s+not\\s+(?:just\\s+|only\\s+)?(?:a |an |the |to )?[a-z]{3,}", "flags": "i", "why": "antithesis \", not Y\" cadence — comma form", "level": "suggestion" },
     { "re": "\\bthe\\s+(?:easy|simple|fun|hard|tricky|tough|real|interesting|important)\\s+part\\b", "flags": "i", "why": "\"the [easy/hard] part\" framing", "level": "warn" },
     { "re": "\\b(?:the\\s+(?:best part|result|catch|kicker|bottom line|takeaway)\\s*\\?|sound familiar\\?|here'?s the (?:thing|kicker|catch)|but here'?s)", "flags": "i", "why": "rhetorical teaser fragment", "level": "warn" },
+    { "re": "(?:\\bis|\\bwas|'s)\\s+the\\s+(?:whole|entire)\\s+[a-z]+|(?:\\bis|'s)\\s+the\\s+point\\b", "flags": "i", "why": "emphatic closer (\"is the whole X\" / \"is the point\")", "level": "suggestion" },
     { "re": "\\bnot only\\b[^.?!]{1,60}\\bbut also\\b", "flags": "i", "why": "\"not only … but also\" cadence", "level": "warn" },
     { "re": "\\bwhether you'?re\\b[^.?!]{1,60}\\bor\\b", "flags": "i", "why": "\"whether you're X or Y\" cadence", "level": "warn" },
     { "re": "\\bmore than just\\b", "flags": "i", "why": "\"more than just\" cadence", "level": "warn" },
@@ -21,6 +23,7 @@
   ],
   "lexicon": {
     "suggestion": [
+      "actually", "basically", "essentially", "fundamentally",
       "delve", "seamless", "seamlessly", "robust", "leverage", "elevate", "unlock", "harness",
       "realm", "tapestry", "testament", "embark", "foster", "bustling", "supercharge",
       "effortless", "effortlessly", "empower", "streamline", "game-changer", "game-changing",
