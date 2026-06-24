@@ -2,7 +2,7 @@
 // shape + response parsing (the live call itself is a keyed run, not tested here).
 import assert from "node:assert/strict";
 import { buildRequest, parseResponse } from "./anthropic.mjs";
-import { aiIsms, overclaims, spellCheck, proofread, readability, registryDrift, vocabFromToolset } from "./prose.mjs";
+import { aiIsms, overclaims, spellCheck, proofread, readability, registryDrift, vocabFromToolset, verbVariety, phraseReuse } from "./prose.mjs";
 import { valeLint, valeEnabled } from "./vale.mjs";
 import { textlintEnabled, textlintLint } from "./textlint.mjs";
 import { auditVerb, extractVerb, scanVerb, conceptDriftVerb, registry } from "./verbs.mjs";
@@ -79,6 +79,25 @@ assert.equal(spellCheck("It isn't broken and we're fine").length, 0, "contractio
 // ── prose: readability ("why am I reading this?") ───────────────────────────────
 assert.ok(hits(readability(("word ".repeat(30)).trim(), "body"), /long sentence/), "catches over-long sentence");
 assert.equal(readability("Authority drawn at the door.", "body").length, 0, "short, plain copy → no readability flag");
+
+// ── corpus-level repetition (verb variety + phrase reuse) ───────────────────────
+const verbCat = {
+  b1: { type: "body", value: "Built static-analysis gating into the PR pipeline." },
+  b2: { type: "body", value: "Built a flexible dashboard framework." },
+  b3: { type: "body", value: "Built a content pipeline and Airtable schema." },
+  b4: { type: "body", value: "Led a design system rollout." },
+};
+assert.ok(verbVariety(verbCat).some((f) => /"built" opens 3/.test(f.msg)), "verbVariety flags a repeated opening verb");
+assert.equal(verbVariety(verbCat).length, 1, "only the over-used opener flags; a 1x verb ('Led') does not");
+assert.equal(verbVariety({ x: { type: "body", value: "The boundary an agent acts through." } }).length, 0, "non-verb openers (the/a/I) are skipped");
+const phraseCat = {
+  p1: { type: "body", value: "the contract and validation layer behind purchasing" },
+  p2: { type: "body", value: "I built the contract and validation layer at Aura" },
+  p3: { type: "body", value: "a contract and validation layer, drift-gated in CI" },
+};
+assert.ok(phraseReuse(phraseCat).some((f) => /contract and validation layer/.test(f.msg)), "phraseReuse flags a 4-gram repeated 3x");
+assert.ok(phraseReuse(phraseCat).every((f) => f.level === "suggestion"), "repetition is report-only (suggestion-tier)");
+assert.equal(phraseReuse({ a: { type: "body", value: "unique words here now" }, b: { type: "body", value: "all different content today" } }).length, 0, "no repeated phrase → no findings");
 
 // ── voice-safe levels (downstream note: intentional em-dash voice must not gate) ─
 assert.equal(aiIsms("It isn't a process — it's a door.").find((f) => /antithesis/.test(f.msg)).level, "suggestion", "em-dash antithesis is suggestion, not warn");

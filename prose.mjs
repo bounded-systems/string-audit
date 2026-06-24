@@ -8,6 +8,8 @@
 //   proofread    — mechanical defects spell/grammar miss                            [warn]
 //   readability  — over-long / dense copy you bounce off                      [suggestion]
 //   findOverlaps — symbols whose normalized value collides (dupe/near-dupe copy)
+//   verbVariety  — same opening verb leads N+ entries (résumé "Built, Built…")   [corpus]
+//   phraseReuse  — an n-gram repeated across the corpus (a crutch phrase)        [corpus]
 // AI-tell patterns/lexicon live in ai-tells.json (data, not code) so they track the
 // upstream vale-signs-of-ai-writing corpus; see issue #6. Structural tells that aren't
 // simple regex (em-dash count, anaphora, tricolons) stay in aiIsms() below.
@@ -166,6 +168,100 @@ export function findOverlaps(catalog) {
     (byNorm[n] ||= []).push(sym);
   }
   return Object.values(byNorm).filter((g) => g.length > 1);
+}
+
+// ── Corpus-level repetition (cold-read: "verb verity" / phrase crutches) ──────────
+// Cross-symbol checks (like findOverlaps): they read the whole catalog, not one block.
+// Both return suggestion-level findings — repetition is a smell, not a defect, and some
+// (a brand line, a thesis) is deliberate. Catalogs of résumé bullets benefit most.
+
+// Openers that aren't action verbs — skip them so only verb-led entries are judged.
+const NON_VERB_OPENERS = new Set(
+  ("the a an i it this that these those my our your their his her its we you they he she" +
+   " and but or so for to of in on at by with from as is are was were be been being" +
+   " what when where which who how why if then there here one two each every both all").split(" "),
+);
+
+// Résumé action-verb alternatives. The suggestion sizes itself to the group and hands
+// back DISTINCT options, so you vary the whole cluster at once instead of swapping every
+// occurrence to one new word (which just relocates the repetition).
+const VERB_SYNONYMS = {
+  built: ["engineered", "created", "developed", "delivered", "shipped", "designed", "implemented"],
+  made: ["created", "produced", "delivered", "turned out", "drove"],
+  led: ["drove", "directed", "spearheaded", "headed", "ran", "guided"],
+  designed: ["architected", "modeled", "shaped", "built", "structured"],
+  created: ["built", "developed", "produced", "introduced", "launched"],
+  drove: ["led", "spearheaded", "pushed", "delivered", "accelerated"],
+  architected: ["designed", "engineered", "structured", "modeled"],
+  developed: ["built", "engineered", "created", "produced", "advanced"],
+  shipped: ["delivered", "launched", "released", "rolled out", "landed"],
+  improved: ["boosted", "increased", "raised", "strengthened", "sharpened", "lifted"],
+  managed: ["ran", "led", "oversaw", "coordinated", "directed"],
+  automated: ["streamlined", "scripted", "scheduled", "mechanized"],
+  reduced: ["cut", "lowered", "trimmed", "shrank", "slashed"],
+  increased: ["boosted", "raised", "grew", "lifted", "drove up"],
+  launched: ["shipped", "released", "rolled out", "introduced", "debuted"],
+};
+
+// verbVariety — the same opening word leading `min`+ entries (the résumé "Built, Built,
+// Built…" tell). Only counts verb-ish openers; NON_VERB_OPENERS are skipped. The finding
+// suggests a distinct alternative for the whole group (keep one, vary the rest).
+export function verbVariety(catalog, { min = 3 } = {}) {
+  const lead = {};
+  for (const [sym, { value }] of Object.entries(catalog)) {
+    const w = (value.trim().match(/^([A-Za-z][A-Za-z'-]+)/)?.[1] || "").toLowerCase();
+    if (!w || NON_VERB_OPENERS.has(w)) continue;
+    (lead[w] ||= []).push(sym);
+  }
+  return Object.entries(lead)
+    .filter(([, syms]) => syms.length >= min)
+    .sort((a, b) => b[1].length - a[1].length)
+    .map(([verb, syms]) => {
+      const suggest = (VERB_SYNONYMS[verb] || []).slice(0, syms.length - 1); // keep one
+      const tip = suggest.length
+        ? `keep one, give the rest distinct verbs: ${suggest.join(", ")}`
+        : "give each a distinct action verb (don't swap all to one new word)";
+      return {
+        level: "suggestion", verb, count: syms.length, symbols: syms, suggest,
+        msg: `verb variety: "${verb}" opens ${syms.length} entries — ${tip}`,
+      };
+    });
+}
+
+// phraseReuse — n-grams repeated `min`+ times across the corpus (the "contract-and-
+// validation layer ×5" crutch). Keeps only maximal grams (drops a shorter gram fully
+// contained in a longer, at-least-as-frequent one) so you see the whole phrase.
+export function phraseReuse(catalog, { n = 4, min = 3 } = {}) {
+  const count = {};
+  for (const { value } of Object.values(catalog)) {
+    const words = value.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter(Boolean);
+    for (let i = 0; i + n <= words.length; i++) {
+      const g = words.slice(i, i + n).join(" ");
+      count[g] = (count[g] || 0) + 1;
+    }
+  }
+  const reused = new Map(Object.entries(count).filter(([, c]) => c >= min));
+  // Merge grams that overlap by n-1 words and share a count into the maximal phrase,
+  // so a long repeated phrase reports once ("the security layer for agentic systems")
+  // rather than as every sliding n-gram window.
+  const used = new Set();
+  const out = [];
+  for (const [g, c] of [...reused].sort((a, b) => b[1] - a[1])) {
+    if (used.has(g)) continue;
+    used.add(g);
+    const words = g.split(" ");
+    const neighbour = (pred) => [...reused].find(([g2, c2]) => !used.has(g2) && c2 === c && pred(g2.split(" ")));
+    for (let ext = true; ext; ) {
+      ext = false;
+      const r = neighbour((w) => w.slice(0, n - 1).join(" ") === words.slice(-(n - 1)).join(" "));
+      if (r) { words.push(r[0].split(" ").at(-1)); used.add(r[0]); ext = true; }
+      const l = neighbour((w) => w.slice(1).join(" ") === words.slice(0, n - 1).join(" "));
+      if (l) { words.unshift(l[0].split(" ")[0]); used.add(l[0]); ext = true; }
+    }
+    const phrase = words.join(" ");
+    out.push({ level: "suggestion", phrase, count: c, msg: `phrase reuse: "${phrase}" ×${c} — keep one, rephrase the other ${c - 1} distinctly` });
+  }
+  return out.sort((a, b) => b.count - a.count);
 }
 
 // ── Registry-aware drift check (issue #22, Direction 2) ──────────────────────

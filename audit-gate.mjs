@@ -19,7 +19,7 @@
 //   An entry with no symbol ("" or absent) matches that check on any symbol.
 
 import { readFileSync, existsSync } from "node:fs";
-import { aiIsms, overclaims, proofread, readability } from "./prose.mjs";
+import { aiIsms, overclaims, proofread, readability, verbVariety, phraseReuse } from "./prose.mjs";
 import { loadCatalog } from "./catalog.mjs";
 
 const strict = process.argv.includes("--strict");
@@ -97,6 +97,14 @@ console.log(`\n  AUDIT GATE — prose + grounding · ${symCount} symbol${symCoun
 for (const { symbol, type, findings } of symbolsWithFindings) {
   console.log(`  ${symbol.padEnd(24)} [${type.padEnd(8)}]`);
   for (const f of findings) console.log(`       ${GLYPH[f.level]} ${f.msg}`);
+}
+
+// Corpus-level repetition (verb variety + phrase reuse) — report-only: every finding
+// is suggestion-tier, so it surfaces the smell without ever failing --strict.
+const corpus = [...verbVariety(catalog), ...phraseReuse(catalog)];
+if (corpus.length) {
+  console.log(`\n  REPETITION — across all ${symCount} symbol${symCount !== 1 ? "s" : ""} (report-only)`);
+  for (const f of corpus) console.log(`       ${GLYPH[f.level]} ${f.msg}`);
 }
 
 const attestedNote = attestedRaw.length ? ` · ${attestedRaw.length} attested (demoted to suggestion)` : "";
