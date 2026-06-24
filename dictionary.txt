@@ -45,3 +45,46 @@ provenance
 anthropic
 llm
 sha256
+
+# résumé domain terms (robertdelanghe.dev / surfaces)
+typeclasses
+unrepresentable
+orgs
+frontend
+perf
+postgres
+crm
+api
+etl
+pdf
+contentful
+claude
+
+# proper nouns (names / orgs / schools / places / langs on the résumé)
+robert
+delanghe
+kaleida
+bennington
+brooklyn
+haskell
+
+# commerce / supply-chain integration vocabulary (Aura)
+netsuite
+shopify
+edi
+ltl
+prs
+
+# month abbreviations (date spans)
+jan
+feb
+mar
+apr
+may
+jun
+jul
+aug
+sep
+oct
+nov
+dec
