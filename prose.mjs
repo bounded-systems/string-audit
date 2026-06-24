@@ -182,8 +182,30 @@ const NON_VERB_OPENERS = new Set(
    " what when where which who how why if then there here one two each every both all").split(" "),
 );
 
+// Résumé action-verb alternatives. The suggestion sizes itself to the group and hands
+// back DISTINCT options, so you vary the whole cluster at once instead of swapping every
+// occurrence to one new word (which just relocates the repetition).
+const VERB_SYNONYMS = {
+  built: ["engineered", "created", "developed", "delivered", "shipped", "designed", "implemented"],
+  made: ["created", "produced", "delivered", "turned out", "drove"],
+  led: ["drove", "directed", "spearheaded", "headed", "ran", "guided"],
+  designed: ["architected", "modeled", "shaped", "built", "structured"],
+  created: ["built", "developed", "produced", "introduced", "launched"],
+  drove: ["led", "spearheaded", "pushed", "delivered", "accelerated"],
+  architected: ["designed", "engineered", "structured", "modeled"],
+  developed: ["built", "engineered", "created", "produced", "advanced"],
+  shipped: ["delivered", "launched", "released", "rolled out", "landed"],
+  improved: ["boosted", "increased", "raised", "strengthened", "sharpened", "lifted"],
+  managed: ["ran", "led", "oversaw", "coordinated", "directed"],
+  automated: ["streamlined", "scripted", "scheduled", "mechanized"],
+  reduced: ["cut", "lowered", "trimmed", "shrank", "slashed"],
+  increased: ["boosted", "raised", "grew", "lifted", "drove up"],
+  launched: ["shipped", "released", "rolled out", "introduced", "debuted"],
+};
+
 // verbVariety — the same opening word leading `min`+ entries (the résumé "Built, Built,
-// Built…" tell). Only counts verb-ish openers; NON_VERB_OPENERS are skipped.
+// Built…" tell). Only counts verb-ish openers; NON_VERB_OPENERS are skipped. The finding
+// suggests a distinct alternative for the whole group (keep one, vary the rest).
 export function verbVariety(catalog, { min = 3 } = {}) {
   const lead = {};
   for (const [sym, { value }] of Object.entries(catalog)) {
@@ -194,10 +216,16 @@ export function verbVariety(catalog, { min = 3 } = {}) {
   return Object.entries(lead)
     .filter(([, syms]) => syms.length >= min)
     .sort((a, b) => b[1].length - a[1].length)
-    .map(([verb, syms]) => ({
-      level: "suggestion", verb, count: syms.length, symbols: syms,
-      msg: `verb variety: "${verb}" opens ${syms.length} entries — vary the action verb`,
-    }));
+    .map(([verb, syms]) => {
+      const suggest = (VERB_SYNONYMS[verb] || []).slice(0, syms.length - 1); // keep one
+      const tip = suggest.length
+        ? `keep one, give the rest distinct verbs: ${suggest.join(", ")}`
+        : "give each a distinct action verb (don't swap all to one new word)";
+      return {
+        level: "suggestion", verb, count: syms.length, symbols: syms, suggest,
+        msg: `verb variety: "${verb}" opens ${syms.length} entries — ${tip}`,
+      };
+    });
 }
 
 // phraseReuse — n-grams repeated `min`+ times across the corpus (the "contract-and-
@@ -231,7 +259,7 @@ export function phraseReuse(catalog, { n = 4, min = 3 } = {}) {
       if (l) { words.unshift(l[0].split(" ")[0]); used.add(l[0]); ext = true; }
     }
     const phrase = words.join(" ");
-    out.push({ level: "suggestion", phrase, count: c, msg: `phrase reuse: "${phrase}" ×${c} — vary it` });
+    out.push({ level: "suggestion", phrase, count: c, msg: `phrase reuse: "${phrase}" ×${c} — keep one, rephrase the other ${c - 1} distinctly` });
   }
   return out.sort((a, b) => b.count - a.count);
 }
