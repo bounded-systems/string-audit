@@ -88,3 +88,17 @@ sep
 oct
 nov
 dec
+
+# agentic + cv-application domain terms (bdelanghe/cv copy-review)
+agentic
+agentmail
+codebase
+haize
+jds
+json
+linkedin
+rebases
+starlark
+swe
+toto
+unparseable
