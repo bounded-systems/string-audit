@@ -204,23 +204,36 @@ export function verbVariety(catalog, { min = 3 } = {}) {
 // validation layer ×5" crutch). Keeps only maximal grams (drops a shorter gram fully
 // contained in a longer, at-least-as-frequent one) so you see the whole phrase.
 export function phraseReuse(catalog, { n = 4, min = 3 } = {}) {
-  const count = {}, where = {};
-  for (const [sym, { value }] of Object.entries(catalog)) {
+  const count = {};
+  for (const { value } of Object.values(catalog)) {
     const words = value.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter(Boolean);
     for (let i = 0; i + n <= words.length; i++) {
       const g = words.slice(i, i + n).join(" ");
       count[g] = (count[g] || 0) + 1;
-      (where[g] ||= new Set()).add(sym);
     }
   }
-  const reused = Object.entries(count).filter(([, c]) => c >= min);
-  return reused
-    .filter(([g, c]) => !reused.some(([g2, c2]) => g2 !== g && g2.includes(g) && c2 >= c))
-    .sort((a, b) => b[1] - a[1])
-    .map(([phrase, c]) => ({
-      level: "suggestion", phrase, count: c, symbols: [...where[phrase]],
-      msg: `phrase reuse: "${phrase}" ×${c} — vary it`,
-    }));
+  const reused = new Map(Object.entries(count).filter(([, c]) => c >= min));
+  // Merge grams that overlap by n-1 words and share a count into the maximal phrase,
+  // so a long repeated phrase reports once ("the security layer for agentic systems")
+  // rather than as every sliding n-gram window.
+  const used = new Set();
+  const out = [];
+  for (const [g, c] of [...reused].sort((a, b) => b[1] - a[1])) {
+    if (used.has(g)) continue;
+    used.add(g);
+    const words = g.split(" ");
+    const neighbour = (pred) => [...reused].find(([g2, c2]) => !used.has(g2) && c2 === c && pred(g2.split(" ")));
+    for (let ext = true; ext; ) {
+      ext = false;
+      const r = neighbour((w) => w.slice(0, n - 1).join(" ") === words.slice(-(n - 1)).join(" "));
+      if (r) { words.push(r[0].split(" ").at(-1)); used.add(r[0]); ext = true; }
+      const l = neighbour((w) => w.slice(1).join(" ") === words.slice(0, n - 1).join(" "));
+      if (l) { words.unshift(l[0].split(" ")[0]); used.add(l[0]); ext = true; }
+    }
+    const phrase = words.join(" ");
+    out.push({ level: "suggestion", phrase, count: c, msg: `phrase reuse: "${phrase}" ×${c} — vary it` });
+  }
+  return out.sort((a, b) => b.count - a.count);
 }
 
 // ── Registry-aware drift check (issue #22, Direction 2) ──────────────────────
