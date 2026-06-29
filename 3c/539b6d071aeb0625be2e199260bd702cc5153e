@@ -1,0 +1,23 @@
+.release/README.md
+  s_98e316d0b3248a::t_2c7d7df6bf64d7 3-7,19-30
+.release/adopt-mint.md
+  s_98e316d0b3248a::t_13aef425e8c451 1-4
+.github/workflows/release.yml
+  s_98e316d0b3248a::t_1f168b83a020d4 3-8,11,14-15,19-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "3c539b6d071aeb0625be2e199260bd702cc5153e",
+  "prompts": {},
+  "sessions": {
+    "s_98e316d0b3248a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8db980ee-eb6b-4866-832b-f795cef7f33c",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Robert DeLanghe <1240090+bdelanghe@users.noreply.github.com>"
+    }
+  }
+}
