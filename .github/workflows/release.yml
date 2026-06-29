@@ -1,43 +1,21 @@
 name: release
 
-# Cut a GitHub release when package.json's version changes on main. The version bump
-# still merges via PR (normal flow); this job tags vX.Y.Z on the merge commit and
-# publishes a release with auto-generated notes — so no manual `gh release create` or
-# tag push is needed (and tag pushes 403 from the dev sandbox anyway). Idempotent:
-# if the tag already exists, it no-ops.
+# Release provenance via the bounded-systems mint capability. On a v<version> tag
+# (cut by `mint release`), emits the deterministic in-toto release Statement
+# (tag → version plan → commit), keyless-signs it (cosign/OIDC), and attaches it
+# to the GitHub release. The registry publish stays in its existing workflow;
+# this job owns VERSION + TAG provenance only. Pinned to an immutable mint commit
+# SHA; bump when mint tags.
 on:
   push:
-    branches: [main]
-    paths: ["package.json"]
+    tags: ["v*"]
 
 permissions:
-  contents: write # create tags + releases
+  contents: write   # create / upload to the GitHub release
+  id-token: write   # OIDC — cosign keyless signing
 
 jobs:
   release:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          fetch-depth: 0 # need tags + history to tell if this version is already released
-      - name: Read version from package.json
-        id: v
-        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
-      - name: Already released?
-        id: check
-        run: |
-          if git rev-parse "v${{ steps.v.outputs.version }}" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::v${{ steps.v.outputs.version }} already tagged — nothing to release."
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Create release
-        if: steps.check.outputs.exists == 'false'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create "v${{ steps.v.outputs.version }}" \
-            --target "${{ github.sha }}" \
-            --title "string-audit v${{ steps.v.outputs.version }}" \
-            --generate-notes
+    uses: bounded-systems/mint/.github/workflows/release-provenance.yml@v0.3.1 # mint
+    with:
+      ref: v0.3.1
