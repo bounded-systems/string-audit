@@ -20,6 +20,7 @@
   },
   "license": "PolyForm-Noncommercial-1.0.0",
   "dependencies": {
+    "@bounded-systems/brand": "^1.4.0",
     "@bounded-systems/verbspec": "npm:@jsr/bounded-systems__verbspec@^0.3.0",
     "an-array-of-english-words": "^2.0.0",
     "write-good": "^1.0.8",
