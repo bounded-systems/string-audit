@@ -145,6 +145,6 @@ em-dash voice tells (antithesis, cadence) are `suggestion`, not `warn`, so inten
 doesn't gate downstream.
 `cas`/`anchored-chain` are optional deps (the `STORE=cas`/socket backings); the default
 run needs neither. The default catalog is the **real semantic-key registry** —
-[`brand`](https://github.com/bounded-systems/brand)'s canonical content tokens, vendored
-at `vendor/brand` (DTCG `content/strings.json`). Point `CATALOG=` at a surface's own
-merged `content/strings.json` to audit its copy; the photo-frame demo catalog is gone.
+[`brand`](https://github.com/bounded-systems/brand)'s canonical content tokens, from the
+`@bounded-systems/brand` npm dependency (DTCG `content/strings.json`). Point `CATALOG=`
+at a surface's own merged `content/strings.json` to audit its copy.

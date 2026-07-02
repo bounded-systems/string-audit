@@ -19,9 +19,9 @@ import { makeStore } from "./store.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 // Default catalog = the real semantic-key registry: bounded-systems/brand's canonical
-// content tokens, vendored as a submodule (vendor/brand). DTCG format, parsed by
-// loadCatalog. Point CATALOG=<path> at a surface's merged content/strings.json instead.
-const DEFAULT_CATALOG = join(here, "vendor/brand/content/strings.json");
+// content tokens, from the @bounded-systems/brand npm dependency. DTCG format, parsed
+// by loadCatalog. Point CATALOG=<path> at a surface's merged content/strings.json instead.
+const DEFAULT_CATALOG = join(here, "node_modules/@bounded-systems/brand/content/strings.json");
 const Finding = z.object({ level: z.enum(["error", "warn", "suggestion"]), msg: z.string() });
 const GLYPH = { error: "✗", warn: "⚠", suggestion: "·" }; // cf. Vale severities
 const ORDER = { error: 0, warn: 1, suggestion: 2 };
@@ -32,7 +32,7 @@ export const auditVerb = defineVerb({
   summary: "Audit every catalog symbol (type-scoped + prose), CAS-cached; report scores + findings.",
   actor: "audit",
   input: z.object({
-    catalog: z.string().optional().describe("Path to the typed-symbol catalog (default $CATALOG or the vendored brand registry, vendor/brand/content/strings.json)."),
+    catalog: z.string().optional().describe("Path to the typed-symbol catalog (default $CATALOG or the vendored brand registry, node_modules/@bounded-systems/brand/content/strings.json)."),
     grounding: z.string().optional().describe("Path to the grounding facts a `claim` may assert (default $GROUNDING / sibling)."),
     store: z.enum(["fs", "cas", "socket"]).optional().describe("Result store backend (default $STORE or fs)."),
     version: z.string().optional().describe("Cache version; bump to invalidate (default $AUDIT_VERSION or 1)."),
@@ -167,7 +167,7 @@ export const extractVerb = defineVerb({
   actor: "audit",
   input: z.object({
     file: z.string().describe("Path to the HTML surface to scan."),
-    catalog: z.string().optional().describe("Path to the typed-symbol catalog (default $CATALOG or the vendored brand registry, vendor/brand/content/strings.json)."),
+    catalog: z.string().optional().describe("Path to the typed-symbol catalog (default $CATALOG or the vendored brand registry, node_modules/@bounded-systems/brand/content/strings.json)."),
     emit: z.boolean().optional().describe("Emit a DTCG content/strings.json of the surface's strings (instead of the coverage report) — bootstrap a catalog from a page."),
   }),
   positionals: ["file"],
