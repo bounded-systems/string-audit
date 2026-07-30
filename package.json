@@ -31,7 +31,7 @@
     "@bounded-systems/cas": "npm:@jsr/bounded-systems__cas@^0.1.2",
     "acorn": "^8.0.0",
     "stemmer": "^2.0.0",
-    "textlint": "^14.0.0",
+    "textlint": "^15.7.1",
     "textlint-rule-write-good": "^2.0.0"
   },
   "devDependencies": {
