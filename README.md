@@ -21,6 +21,21 @@ ANTHROPIC_API_KEY=… node audit.mjs   # real audits — only on cache-misses
 4. **Grounded, not fabricated** — a `claim` may only assert facts in the grounding
    source; ungrounded numbers/ratings/specs are *flagged*, never rewritten as fact.
 
+### The grounding source
+`GROUNDING` (or `--grounding`) accepts either shape:
+
+```jsonc
+["docs generate from source", "in-toto"]              // flat — one repo auditing itself
+{ "site": ["in-toto"], "brand": ["door", "agent"] }   // namespaced — an org-wide aggregate
+```
+
+Namespaced, a symbol keyed `<repo>.<key>` is grounded **only** by `<repo>`'s own terms, and
+a repo that declares no terms **fails closed**. A flat union across repos does not work as a
+grounding source: it lets one repo's vocabulary back another repo's claims, so a claim passes
+on a bare noun nobody wrote it for (content-catalog#14). Terms match on **word boundaries**,
+so `"agent"` grounds *"the agent holds nothing"* but not *"agentic"* or *"management"*.
+Whether the source is flat or namespaced is printed in the gate's header.
+
 ## Providers
 - **deterministic** (default, offline) — local checks; reproducible; no key needed.
 - **anthropic** (`anthropic.mjs`) — runs on a cache **miss** when `ANTHROPIC_API_KEY`

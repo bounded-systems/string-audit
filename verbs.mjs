@@ -12,6 +12,7 @@ import { defineVerb, toMcpTool } from "@bounded-systems/verbspec";
 import { auditWithAnthropic } from "./anthropic.mjs";
 import { spellCheck, grammarCheck, aiIsms, overclaims, proofread, readability, findOverlaps, registryDrift, vocabFromToolset } from "./prose.mjs";
 import { typeFindings, claimFindings, inferType, SYMBOL_TYPES } from "./types.mjs";
+import { termsFor } from "./grounding.mjs";
 import { valeLint } from "./vale.mjs";
 import { textlintLint } from "./textlint.mjs";
 import { loadCatalog } from "./catalog.mjs";
@@ -75,8 +76,12 @@ export const auditVerb = defineVerb({
     const sha = (s) => createHash("sha256").update(s).digest("hex").slice(0, 16);
     const cacheKey = (type, value) => sha(`${AUDIT_VERSION}:${type}:${value}`);
     // type-scoped checks from the shared Zod contracts (types.mjs); claim is grounding-aware.
-    const runDet = (type, value) => {
-      const findings = type === "claim" ? claimFindings(value, GROUNDED) : typeFindings(type, value);
+    // The grounding source may be flat or namespaced by repo (grounding.mjs), so the terms a
+    // claim may draw on are resolved per symbol, not once for the whole run.
+    const runDet = (symbol, type, value) => {
+      const findings = type === "claim"
+        ? claimFindings(value, termsFor(symbol, GROUNDED))
+        : typeFindings(type, value);
       return { score: Math.max(0, 10 - 2 * findings.length), findings };
     };
 
@@ -89,7 +94,9 @@ export const auditVerb = defineVerb({
       const cached = !!r;
       if (cached) hits++;
       else {
-        r = useLLM ? await auditWithAnthropic({ type, value, grounding: GROUNDED }) : runDet(type, value);
+        r = useLLM
+          ? await auditWithAnthropic({ type, value, grounding: termsFor(symbol, GROUNDED) })
+          : runDet(symbol, type, value);
         await store.put(key, r);
         misses++;
       }
