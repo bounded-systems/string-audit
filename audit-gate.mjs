@@ -6,7 +6,10 @@
 //
 // Env vars (all optional except CATALOG):
 //   CATALOG   path to the typed-symbol catalog JSON (required)
-//   GROUNDING path to grounding-facts JSON (array of strings)
+//   GROUNDING path to grounding-facts JSON — either a flat array of terms (a single repo
+//             auditing its own catalog) or a namespaced { "<repo>": [terms] } map (the
+//             org-wide aggregate, where repo X's claims are groundable only by X's terms).
+//             Both shapes are accepted; see grounding.mjs.
 //   ATTESTED  path to attested-claims JSON (array of { symbol, check })
 //
 // Flags:
@@ -21,6 +24,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { aiIsms, overclaims, proofread, readability, verbVariety, phraseReuse } from "./prose.mjs";
 import { loadCatalog } from "./catalog.mjs";
+import { STAT_RE, isGrounded, isNamespaced, repoFor, termsFor } from "./grounding.mjs";
 
 const strict = process.argv.includes("--strict");
 
@@ -32,10 +36,11 @@ if (!catalogPath) {
 
 const catalog = loadCatalog(catalogPath);
 
-const GROUNDED =
+const GROUNDING =
   process.env.GROUNDING && existsSync(process.env.GROUNDING)
     ? JSON.parse(readFileSync(process.env.GROUNDING, "utf8"))
     : [];
+const NAMESPACED = isNamespaced(GROUNDING);
 
 const attestedRaw =
   process.env.ATTESTED && existsSync(process.env.ATTESTED)
@@ -52,17 +57,30 @@ const isAttested = (symbol, msg) => {
   return attestedSet.has(`${symbol}::${c}`) || attestedSet.has(`::${c}`);
 };
 
-// Grounding check (inline — avoids importing verbs.mjs → store.mjs → JSR deps).
-// Matches the deterministicAudits "claim" logic in verbs.mjs.
-const STAT_RE = /\b\d[\d,. ]*\s*(%|stars?|customers?|reviews?|bpm|days?|x)\b/i;
-function groundingFindings(value) {
+// Grounding check. The matcher itself lives in grounding.mjs (zero-dep, so importing it
+// here does not drag verbs.mjs → store.mjs → JSR deps in) and is shared with the
+// deterministic "claim" logic in types.mjs, so the CI gate and the CLI/MCP path cannot
+// drift apart. The message strings stay here: `checkName` below splits on ":" to match
+// ATTESTED entries, so the "grounding:" prefix is load-bearing.
+function groundingFindings(symbol, value) {
+  const terms = termsFor(symbol, GROUNDING);
+  if (isGrounded(value, terms)) return [];
+
+  // Under a namespaced source, "this repo declared no grounding at all" and "this repo's
+  // terms don't back this claim" are very different maintainer problems — say which.
+  const repo = NAMESPACED ? repoFor(symbol, GROUNDING) : null;
+  const scope = !NAMESPACED
+    ? ""
+    : repo === null
+      ? " — no grounding declared for this symbol's repo"
+      : terms.length === 0
+        ? ` — ${repo} declares an empty grounding set`
+        : ` — not in ${repo}'s grounding`;
+
   const stat = value.match(STAT_RE);
-  const grounded = GROUNDED.some((g) => value.toLowerCase().includes(g));
-  if (stat && !grounded)
-    return [{ level: "error", msg: `grounding: UNGROUNDED stat "${stat[0].trim()}" — not in grounding source` }];
-  if (!stat && !grounded)
-    return [{ level: "error", msg: "grounding: claim asserts nothing grounded — verify against source" }];
-  return [];
+  return stat
+    ? [{ level: "error", msg: `grounding: UNGROUNDED stat "${stat[0].trim()}" — not in grounding source${scope}` }]
+    : [{ level: "error", msg: `grounding: claim asserts nothing grounded — verify against source${scope}` }];
 }
 
 const ORDER = { error: 0, warn: 1, suggestion: 2 };
@@ -77,7 +95,7 @@ for (const [symbol, { type, value }] of Object.entries(catalog)) {
     ...overclaims(value),
     ...proofread(value),
     ...readability(value, type),
-    ...(type === "claim" ? groundingFindings(value) : []),
+    ...(type === "claim" ? groundingFindings(symbol, value) : []),
   ];
 
   if (!raw.length) continue;
@@ -92,7 +110,12 @@ for (const [symbol, { type, value }] of Object.entries(catalog)) {
 }
 
 const symCount = Object.keys(catalog).length;
-console.log(`\n  AUDIT GATE — prose + grounding · ${symCount} symbol${symCount !== 1 ? "s" : ""}\n  ${"─".repeat(52)}`);
+// Name the grounding mode: a namespaced source silently read as flat (or vice versa) is
+// exactly the kind of thing that should never be invisible in the log.
+const groundingMode = NAMESPACED
+  ? `namespaced · ${Object.keys(GROUNDING).filter((k) => !k.startsWith("$")).length} repo(s)`
+  : `flat · ${GROUNDING.length} term(s)`;
+console.log(`\n  AUDIT GATE — prose + grounding · ${symCount} symbol${symCount !== 1 ? "s" : ""} · grounding: ${groundingMode}\n  ${"─".repeat(52)}`);
 
 for (const { symbol, type, findings } of symbolsWithFindings) {
   console.log(`  ${symbol.padEnd(24)} [${type.padEnd(8)}]`);
