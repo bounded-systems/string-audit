@@ -24,13 +24,21 @@ export const textlintEnabled = () => !!process.env.AUDIT_TEXTLINT;
 export async function textlintLint(value) {
   if (!textlintEnabled()) return [];
   try {
-    const { TextLintEngine } = await import("textlint");
-    const engine = new TextLintEngine({ rules: { "write-good": true } });
-    const results = await engine.executeOnText(value);
+    // textlint 15 removed TextLintEngine and its inline `rules` option; rules now
+    // come from a descriptor, so the write-good selection moved to .textlintrc.json
+    // beside this file. Same rule, same shape out — it is only where the rule is
+    // named that changed.
+    const { createLinter, loadTextlintrc } = await import("textlint");
+    const { fileURLToPath } = await import("node:url");
+    const descriptor = await loadTextlintrc({
+      configFilePath: fileURLToPath(new URL(".textlintrc.json", import.meta.url)),
+    });
+    // lintText returns ONE result, where executeOnText returned an array.
+    const result = await createLinter({ descriptor }).lintText(value, "input.txt");
     const sev = (s) => s === 2 ? "error" : s === 1 ? "warn" : "suggestion";
-    return results.flatMap((r) =>
-      r.messages.map((m) => ({ level: sev(m.severity), msg: `textlint ${m.ruleId}: ${m.message}` })),
-    ).slice(0, 4);
+    return result.messages
+      .map((m) => ({ level: sev(m.severity), msg: `textlint ${m.ruleId}: ${m.message}` }))
+      .slice(0, 4);
   } catch {
     return []; // textlint not installed or rule not found → silent no-op
   }
