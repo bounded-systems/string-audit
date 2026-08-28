@@ -7,6 +7,7 @@ import { valeLint, valeEnabled } from "./vale.mjs";
 import { textlintEnabled, textlintLint } from "./textlint.mjs";
 import { auditVerb, extractVerb, scanVerb, conceptDriftVerb, registry } from "./verbs.mjs";
 import { typeFindings, claimFindings } from "./types.mjs";
+import { matchesTerm, isNamespaced, repoFor, termsFor, isGrounded, groundedBy } from "./grounding.mjs";
 import { toMcpToolset, toMcpTool, parseArgs } from "@bounded-systems/verbspec";
 
 // request shape
@@ -172,6 +173,51 @@ assert.ok(typeFindings("headline", "x".repeat(80)).includes("too long for a head
 assert.ok(typeFindings("cta", "Learn more about everything here").includes("doesn't open with an action verb"), "a non-action-verb cta fails its contract");
 assert.equal(claimFindings("Rated 4.8 stars by 12,000 customers.", []).length, 1, "an ungrounded stat is flagged");
 assert.equal(claimFindings("Rated 4.8 stars.", ["4.8 stars"]).length, 0, "a grounded stat passes");
+
+// ── grounding.mjs: namespacing + word-boundary matching (content-catalog#14) ────
+// The hole: one flat org-wide union meant any repo's vocabulary grounded every repo's
+// claims, so a fabricated claim passed on a bare noun an unrelated repo contributed.
+const BRAND_VOCAB = ["agent", "door", "process", "bounded", "capability security"];
+const SITE_FACTS = ["broker daemon", "never holds the credential", "in-toto", "slsa"];
+const NS = { brand: BRAND_VOCAB, site: SITE_FACTS };
+
+// word-boundary, not substring — the whole point of the hardening
+assert.ok(matchesTerm("The agent holds nothing", "agent"), "a whole-word term matches");
+assert.ok(!matchesTerm("agentic tooling reshapes management", "agent"), "\"agent\" must not match \"agentic\"/\"management\"");
+assert.ok(!matchesTerm("the doorway is open", "door"), "\"door\" must not match \"doorway\"");
+assert.ok(!matchesTerm("processed containers", "process"), "\"process\" must not match \"processed\"");
+assert.ok(matchesTerm("verifiable in-toto / SLSA provenance", "in-toto"), "a hyphenated term still matches");
+assert.ok(matchesTerm("Rated 4.8 stars.", "4.8 stars"), "a term ending in a digit-word still matches");
+assert.ok(!matchesTerm("anything at all", ""), "an empty term grounds nothing");
+
+// namespacing — a claim is groundable only by its OWN repo's terms
+assert.deepEqual(termsFor("site.claim-broker", NS), SITE_FACTS, "a namespaced symbol resolves to its repo's terms");
+assert.deepEqual(termsFor("brand.thesis", NS), BRAND_VOCAB, "each repo resolves to its own set");
+assert.deepEqual(termsFor("unopted.claim-x", NS), [], "a repo that declared no grounding gets no terms — fail closed");
+assert.deepEqual(termsFor("anything", BRAND_VOCAB), BRAND_VOCAB, "a flat source still grounds every symbol (single-repo callers)");
+assert.equal(isNamespaced(NS), true, "an object source is namespaced");
+assert.equal(isNamespaced(BRAND_VOCAB), false, "an array source is flat");
+
+// repo names may contain dots — `bounded.tools` is a real repo in this org, so splitting
+// the symbol on its FIRST dot would attribute it to a repo named "bounded"
+assert.equal(repoFor("bounded.tools.tagline", { bounded: [], "bounded.tools": [] }), "bounded.tools",
+  "the LONGEST declared repo prefix wins, so dotted repo names resolve correctly");
+assert.equal(repoFor("site.claim-x", NS), "site", "a plain repo name resolves");
+assert.equal(repoFor("nope.claim-x", NS), null, "an undeclared repo resolves to null");
+assert.equal(repoFor("$provenance.x", { $provenance: [] }), null, "$-prefixed keys are metadata, never a repo");
+
+// the exact defeat from the issue: fabricated claims grounded by another repo's vocabulary
+const FABRICATED = "Our agent is provably unbreakable.";
+assert.equal(isGrounded(FABRICATED, [...BRAND_VOCAB, ...SITE_FACTS]), true,
+  "regression witness: the flat union grounded a fabricated claim on brand's bare noun");
+assert.equal(isGrounded(FABRICATED, termsFor("site.claim-fake", NS)), false,
+  "namespaced, site cannot ground a fabricated claim on brand's vocabulary");
+assert.equal(isGrounded("The agent never holds the credential — a broker daemon does.", termsFor("site.claim-broker", NS)), true,
+  "a genuinely-backed site claim still passes on site's own terms");
+assert.deepEqual(groundedBy("The agent never holds the credential — a broker daemon does.", termsFor("site.claim-broker", NS)),
+  ["broker daemon", "never holds the credential"], "groundedBy reports which terms backed the claim");
+
+console.log("✓ grounding verified — per-repo namespacing + word-boundary matching (no cross-repo grounding)");
 
 // concept-drift: per-message coverage vs the brand canon (string-level, tiered matching)
 const cd = await conceptDriftVerb.run({ target: "samples/page.html" });

@@ -2,6 +2,7 @@
 // Used by `audit` (the deterministic type-scoped checks) AND `scan` (Zod-validating the
 // keepers it lifts from source). One place to change the rules for a `headline`/`cta`/`meta`.
 import { z } from "zod";
+import { STAT_RE, isGrounded } from "./grounding.mjs";
 
 // The structural contracts. `claim` is grounding-dependent (the grounding source is
 // per-run), so it isn't a static schema — see claimFindings(). Check order is preserved
@@ -31,12 +32,15 @@ export function typeFindings(type, value) {
 
 // A `claim` may only assert facts in the grounding source; an ungrounded stat is flagged,
 // never rewritten as fact. Dynamic (depends on the per-run grounding), so it's not a schema.
+// `grounded` is the term array this symbol may draw on — callers with a namespaced source
+// resolve it per symbol via termsFor(); the matcher is shared with audit-gate.mjs so the
+// CLI/MCP path and the CI gate agree on what "grounded" means.
 export function claimFindings(value, grounded = []) {
-  const stat = value.match(/\b\d[\d,. ]*\s*(%|stars?|customers?|reviews?|bpm|days?|x)\b/i);
-  const isGrounded = grounded.some((g) => value.toLowerCase().includes(g));
+  const stat = value.match(STAT_RE);
+  const ok = isGrounded(value, grounded);
   return [
-    stat && !isGrounded && `UNGROUNDED stat "${stat[0].trim()}" — not in the grounding source; flag, never ship/rewrite as fact`,
-    !stat && !isGrounded && "claim asserts nothing grounded — verify against source",
+    stat && !ok && `UNGROUNDED stat "${stat[0].trim()}" — not in the grounding source; flag, never ship/rewrite as fact`,
+    !stat && !ok && "claim asserts nothing grounded — verify against source",
   ].filter(Boolean);
 }
 
